@@ -4,10 +4,14 @@
  */
 
 const statusEl = document.getElementById("status");
+const statusDot = document.getElementById("status-dot");
 const treeRoot = document.getElementById("tree-root");
 const refreshBtn = document.getElementById("refresh");
 const clearDataBtn = document.getElementById("clear-data");
 const tooltip = document.getElementById("tooltip");
+const settingsBtn = document.getElementById("settings-btn");
+const settingsOverlay = document.getElementById("settings-overlay");
+const settingsClose = document.getElementById("settings-close");
 
 let activeTabId = null;
 
@@ -174,8 +178,18 @@ function formatTimestamp(ts) {
   return `${time} · ${day}`;
 }
 
-function setStatus(text) {
+function setStatus(text, state = "ready") {
   statusEl.textContent = text;
+  statusDot.classList.remove("loading", "success");
+  if (state === "loading") {
+    statusDot.classList.add("loading");
+  } else if (state === "success") {
+    statusDot.classList.add("success");
+    // Reset to ready after 2 seconds
+    setTimeout(() => {
+      statusDot.classList.remove("success");
+    }, 2000);
+  }
 }
 
 function isChatUrl(url = "") {
@@ -211,6 +225,8 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   row.className = "tree-node";
   row.dataset.nodeId = id;
   row.dataset.depth = depth ?? 0;
+  // Staggered animation delay (max 15 nodes, 30ms each)
+  row.style.animationDelay = `${Math.min(index, 15) * 30}ms`;
   
   const isBranch = type === "branch";
   const isBranchRoot = type === "branchRoot";
@@ -571,7 +587,12 @@ function renderTree(nodes, title, hasAncestry = false) {
   if (filteredNodes.length === 0 && !title) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "No conversation found";
+    empty.innerHTML = `
+      <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+      </svg>
+      <span class="empty-state-text">No conversation found</span>
+    `;
     treeRoot.appendChild(empty);
     return;
   }
@@ -620,10 +641,12 @@ function renderTree(nodes, title, hasAncestry = false) {
   }
 
   const fragment = document.createDocumentFragment();
+  let visualIndex = 0; // Track visual position for staggered animation
   allNodes.forEach((node, idx) => {
     const prevNode = idx > 0 ? allNodes[idx - 1] : null;
     const nextNode = idx < allNodes.length - 1 ? allNodes[idx + 1] : null;
-    fragment.appendChild(createNodeElement(node, idx, allNodes.length, prevNode, nextNode, allNodes));
+    fragment.appendChild(createNodeElement(node, visualIndex, allNodes.length, prevNode, nextNode, allNodes));
+    visualIndex++;
     
     // If this is a collapsed branch with nested branches, render them
     if (node.type === "branch" && !node.expanded && node.nestedBranches?.length > 0) {
@@ -633,13 +656,16 @@ function renderTree(nodes, title, hasAncestry = false) {
       node.nestedBranches.forEach((nestedNode, nestedIdx) => {
         const isFirstNested = nestedIdx === 0;
         const isLastNested = nestedIdx === node.nestedBranches.length - 1;
-        fragment.appendChild(createNestedBranchElement(
+        const nestedEl = createNestedBranchElement(
           nestedNode, 
           node.colorIndex,
           isFirstNested,
           isLastNested,
           mainLineContinues
-        ));
+        );
+        nestedEl.style.animationDelay = `${Math.min(visualIndex, 15) * 30}ms`;
+        fragment.appendChild(nestedEl);
+        visualIndex++;
       });
     }
   });
@@ -731,7 +757,7 @@ async function fetchTree(tab = null) {
   }
 
   try {
-    setStatus("Loading...");
+    setStatus("Loading...", "loading");
     const response = await chrome.tabs.sendMessage(targetTab.id, {
       type: "GET_CONVERSATION_TREE",
     });
@@ -741,7 +767,7 @@ async function fetchTree(tab = null) {
       return null;
     }
 
-    setStatus("Ready");
+    setStatus("Ready", "success");
     return response;
   } catch (err) {
     setStatus(err?.message || "Failed to load");
@@ -771,14 +797,44 @@ async function refresh() {
 // Event Listeners
 // ============================================
 
-refreshBtn.addEventListener("click", refresh);
+// Settings modal handlers
+function openSettings() {
+  settingsOverlay.classList.add("visible");
+}
+
+function closeSettings() {
+  settingsOverlay.classList.remove("visible");
+}
+
+settingsBtn.addEventListener("click", openSettings);
+settingsClose.addEventListener("click", closeSettings);
+
+// Close settings when clicking overlay background
+settingsOverlay.addEventListener("click", (e) => {
+  if (e.target === settingsOverlay) {
+    closeSettings();
+  }
+});
+
+// Close settings on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && settingsOverlay.classList.contains("visible")) {
+    closeSettings();
+  }
+});
+
+refreshBtn.addEventListener("click", () => {
+  closeSettings();
+  refresh();
+});
 
 // Clear all branch data
 clearDataBtn.addEventListener("click", async () => {
   if (confirm("Clear all branch tracking data? This cannot be undone.")) {
     await chrome.storage.local.remove("chatgpt_branch_data");
     await chrome.storage.local.remove("pendingBranch");
-    setStatus("Data cleared");
+    setStatus("Data cleared", "success");
+    closeSettings();
     refresh();
   }
 });
@@ -787,7 +843,7 @@ clearDataBtn.addEventListener("click", async () => {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === "TREE_UPDATED" && msg.nodes) {
     renderTree(msg.nodes, msg.title, msg.hasAncestry);
-    setStatus("Updated");
+    setStatus("Updated", "success");
   }
 });
 

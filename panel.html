@@ -12,17 +12,32 @@
     }
 
     :root {
-      --bg: #0f0f14;
-      --surface: #16161d;
-      --surface-2: #1c1c26;
-      --border: rgb(58, 58, 58);
-      --text: #e4e4ed;
-      --text-muted: #8888a0;
+      --bg: #141414;
+      --surface: #1a1a1a;
+      --surface-2: #222222;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #888888;
       --accent: #6366f1;
       --accent-glow: rgba(99, 102, 241, 0.3);
       --branch: #10b981;
       --branch-glow: rgba(16, 185, 129, 0.3);
       --rail-size: 20px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f5;
+        --surface: #ffffff;
+        --surface-2: #ebebeb;
+        --border: #d0d0d0;
+        --text: #1a1a1a;
+        --text-muted: #666666;
+        --accent: #4f46e5;
+        --accent-glow: rgba(79, 70, 229, 0.2);
+        --branch: #059669;
+        --branch-glow: rgba(5, 150, 105, 0.2);
+      }
     }
 
     body {
@@ -39,42 +54,55 @@
     #header {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 16px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
     }
 
-    #status {
-      flex: 1;
+    #header-title {
       font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    #status-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    #status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.2s ease;
+    }
+
+    #status-dot.loading {
+      background: var(--accent);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    #status-dot.success {
+      background: var(--branch);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    #status {
+      font-size: 11px;
       color: var(--text-muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    #refresh {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      box-shadow: 0 2px 8px var(--accent-glow);
-    }
-
-    #refresh:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px var(--accent-glow);
-    }
-
-    #refresh:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
     }
 
     /* Tree Container */
@@ -86,7 +114,7 @@
     }
 
     #tree-root::-webkit-scrollbar {
-      width: 6px;
+      width: 4px;
     }
 
     #tree-root::-webkit-scrollbar-track {
@@ -94,18 +122,35 @@
     }
 
     #tree-root::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 2px;
+      transition: background 0.2s ease;
+    }
+
+    #tree-root:hover::-webkit-scrollbar-thumb {
       background: var(--border);
-      border-radius: 3px;
+    }
+
+    /* Tree Node Animation */
+    @keyframes nodeEnter {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* Dynamic backbone lines - created for each depth column */
     .tree-backbone {
       position: absolute;
-      top: 30px;
-      bottom: 30px;
-      width: 2px;
+      top: 24px;
+      bottom: 24px;
+      width: 1.5px;
       background: var(--border);
-      opacity: 0.4;
+      opacity: 0.35;
       z-index: -1;
       pointer-events: none;
     }
@@ -113,8 +158,22 @@
     /* Empty State */
     .empty-state {
       text-align: center;
-      padding: 40px 20px;
+      padding: 48px 24px;
       color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .empty-state-icon {
+      width: 32px;
+      height: 32px;
+      opacity: 0.4;
+    }
+
+    .empty-state-text {
+      font-size: 12px;
     }
 
     /* Tree Node */
@@ -123,23 +182,23 @@
       gap: 8px;
       padding: 2px 0;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: background 0.15s ease;
       border-radius: 6px;
       margin: 0;
+      animation: nodeEnter 0.2s ease forwards;
+      opacity: 0;
     }
 
     .tree-node:hover {
-      background: rgba(99, 102, 241, 0.08);
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
     }
 
     .tree-node:hover .tree-card {
       border-color: var(--color, var(--accent));
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--color, var(--accent)) 30%, transparent);
     }
 
     .tree-node.is-branch:hover .tree-card {
       border-color: var(--color, var(--branch));
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--color, var(--branch)) 30%, transparent);
     }
 
     /* Rail (visual connector) */
@@ -162,10 +221,10 @@
       left: 50%;
       top: -2px;
       bottom: -2px;
-      width: 2px;
+      width: 1.5px;
       background: var(--line-color, var(--border));
       transform: translateX(-50%);
-      opacity: 0.6;
+      opacity: 0.5;
     }
 
     .rail-connector {
@@ -182,7 +241,7 @@
       left: 50%;
       top: -2px;
       height: calc(50% + 2px);
-      width: 2px;
+      width: 1.5px;
       background: var(--color, var(--accent));
       transform: translateX(-50%);
     }
@@ -193,7 +252,7 @@
       left: 50%;
       bottom: -2px;
       height: calc(50% + 2px);
-      width: 2px;
+      width: 1.5px;
       background: var(--color, var(--accent));
       transform: translateX(-50%);
     }
@@ -220,46 +279,34 @@
       left: calc(-1 * var(--rail-size) + 9px);
       top: 50%;
       width: calc(var(--rail-size) - 7px);
-      height: 2px;
+      height: 1.5px;
       background: var(--color, var(--branch));
       transform: translateY(-50%);
     }
 
     .rail-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: var(--bg);
-      border: 2px solid var(--color, var(--accent));
+      background: var(--color, var(--accent));
+      border: none;
       position: relative;
       z-index: 1;
-      transition: all 0.12s ease;
-      /* Ensure branch arm pseudo-elements are positioned relative to the dot */
+      transition: transform 0.12s ease;
       overflow: visible;
     }
 
     .tree-node:hover .rail-dot {
-      transform: scale(1.3);
-      box-shadow: 0 0 0 2px var(--accent-glow);
+      transform: scale(1.4);
     }
 
     /* Branch dots use their unique branch color */
     .rail-dot.branch-dot {
-      border-color: var(--branch-color, var(--branch));
       background: var(--branch-color, var(--branch));
     }
 
     .rail-dot.branch-root-dot {
-      border-color: var(--branch);
       background: var(--branch);
-    }
-
-    .tree-node:hover .rail-dot.branch-dot {
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--branch-color, var(--branch)) 30%, transparent);
-    }
-
-    .tree-node:hover .rail-dot.branch-root-dot {
-      box-shadow: 0 0 0 2px var(--branch-glow);
     }
 
     /* Branch card border matches branch color */
@@ -269,14 +316,13 @@
 
     /* Title node styles */
     .tree-node.is-title .rail-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       background: var(--accent);
-      border-color: var(--accent);
     }
 
     .tree-node.is-title .tree-card {
-      background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+      background: var(--surface);
       border-color: var(--accent);
     }
 
@@ -288,10 +334,9 @@
     }
 
     .tree-node.is-ancestor-title .rail-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       background: var(--text-muted);
-      border-color: var(--text-muted);
     }
 
     .card-ancestor-label {
@@ -305,17 +350,15 @@
 
     /* Current title styling - highlighted */
     .tree-node.is-current-title .tree-card {
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, var(--surface) 100%);
+      background: var(--surface);
       border-color: var(--accent);
       border-width: 2px;
     }
 
     .tree-node.is-current-title .rail-dot {
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       background: var(--accent);
-      border-color: var(--accent);
-      box-shadow: 0 0 8px var(--accent-glow);
     }
 
     .card-current-label {
@@ -344,14 +387,13 @@
 
     /* Expanded branch - shows it leads to child content */
     .tree-node.is-expanded .tree-card {
-      background: linear-gradient(135deg, color-mix(in srgb, var(--color, var(--branch)) 10%, var(--surface)) 0%, var(--surface) 100%);
+      background: var(--surface);
       border-color: var(--color, var(--branch));
     }
 
     .tree-node.is-expanded .rail-dot.expanded-dot {
-      width: 10px;
-      height: 10px;
-      box-shadow: 0 0 6px color-mix(in srgb, var(--branch-color, var(--branch)) 50%, transparent);
+      width: 8px;
+      height: 8px;
     }
 
     .tree-node.is-current-path .tree-card {
@@ -369,7 +411,7 @@
       position: absolute;
       left: 50%;
       top: 100%;
-      width: 2px;
+      width: 1.5px;
       height: 28px;
       background: var(--branch-color, var(--branch));
       transform: translateX(-50%);
@@ -383,7 +425,7 @@
       position: absolute;
       left: 50%;
       top: 100%;
-      width: 2px;
+      width: 1.5px;
       height: 16px;
       background: var(--branch-color, var(--branch));
       transform: translateX(-50%);
@@ -430,10 +472,10 @@
       flex: 1;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 8px 10px;
       min-width: 0;
-      transition: all 0.15s ease;
+      transition: border-color 0.15s ease;
     }
 
     .card-header {
@@ -495,7 +537,7 @@
       position: absolute;
       background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 10px 12px;
       font-size: 12px;
       line-height: 1.5;
@@ -504,8 +546,7 @@
       pointer-events: none;
       opacity: 0;
       transform: translateY(-4px);
-      transition: all 0.15s ease;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: opacity 0.15s ease, transform 0.15s ease;
       max-height: 200px;
       overflow-y: auto;
       word-wrap: break-word;
@@ -519,7 +560,6 @@
 
     .tooltip.tooltip-branch {
       border-color: var(--branch);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--branch-glow);
     }
 
     /* Depth-based indentation */
@@ -596,25 +636,24 @@
       left: calc(-0.5 * var(--rail-size) - 1px);
       top: 50%;
       width: calc(0.5 * var(--rail-size) + 1px);
-      height: 2px;
+      height: 1.5px;
       background: var(--branch-color, var(--branch));
       transform: translateY(-50%);
     }
 
     /* Small dot for nested branches - uses BRANCH'S OWN color */
     .nested-dot {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: var(--branch-color, var(--branch));
       border: none;
-      opacity: 0.8;
+      opacity: 0.7;
     }
 
     .nested-branch-node:hover .nested-dot {
-      transform: scale(1.2);
+      transform: scale(1.3);
       opacity: 1;
-      box-shadow: 0 0 4px color-mix(in srgb, var(--branch-color, var(--branch)) 50%, transparent);
     }
 
     /* Compact card for nested branches - uses BRANCH'S OWN color for border */
@@ -625,13 +664,12 @@
       border-radius: 6px;
       padding: 4px 8px;
       opacity: 0.8;
-      transition: all 0.15s ease;
+      transition: opacity 0.15s ease, border-color 0.15s ease;
     }
 
     .nested-branch-node:hover .nested-card {
       opacity: 1;
       border-color: var(--branch-color, var(--branch));
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--branch-color, var(--branch)) 20%, transparent);
     }
 
     /* Compact label for nested branches - uses BRANCH'S OWN color */
@@ -662,17 +700,203 @@
     .nested-card .card-header:has(+ .nested-preview) {
       margin-bottom: 1px;
     }
+
+    /* Settings Button */
+    #settings-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #settings-btn:hover {
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    #settings-btn:hover svg {
+      transform: rotate(90deg);
+    }
+
+    #settings-btn svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.3s ease;
+    }
+
+    /* Settings Overlay */
+    #settings-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    #settings-overlay.visible {
+      display: flex;
+      opacity: 1;
+    }
+
+    @media (prefers-color-scheme: light) {
+      #settings-overlay {
+        background: rgba(0, 0, 0, 0.3);
+      }
+    }
+
+    /* Settings Modal */
+    #settings-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 260px;
+      max-width: 90%;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+      transform: translateY(-10px);
+      transition: transform 0.2s ease;
+    }
+
+    #settings-overlay.visible #settings-modal {
+      transform: translateY(0);
+    }
+
+    @media (prefers-color-scheme: light) {
+      #settings-modal {
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+      }
+    }
+
+    .settings-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .settings-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .settings-actions button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-actions button svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.7;
+      flex-shrink: 0;
+    }
+
+    .settings-actions button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .settings-actions button:hover svg {
+      opacity: 1;
+    }
+
+    .settings-actions button.danger {
+      color: var(--text);
+    }
+
+    .settings-actions button.danger:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    #settings-close {
+      width: 100%;
+      margin-top: 14px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    #settings-close:hover {
+      opacity: 0.9;
+    }
   </style>
 </head>
 <body>
   <div id="header">
-    <span id="status">Ready</span>
-    <button id="refresh">Refresh</button>
-    <button id="clear-data" style="background: #ef4444; font-size: 10px; padding: 4px 8px;">Clear Data</button>
+    <span id="header-title">Branch Tree</span>
+    <div id="status-container">
+      <span id="status-dot"></span>
+      <span id="status">Ready</span>
+    </div>
+    <button id="settings-btn" title="Settings">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      </svg>
+    </button>
   </div>
   <div id="tree-root">
     <div id="tooltip" class="tooltip"></div>
   </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-overlay">
+    <div id="settings-modal">
+      <div class="settings-header">Settings</div>
+      <div class="settings-actions">
+        <button id="refresh">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          Refresh Tree
+        </button>
+        <button id="clear-data" class="danger">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+          Clear All Data
+        </button>
+      </div>
+      <button id="settings-close">Done</button>
+    </div>
+  </div>
+
   <script src="panel.js"></script>
 </body>
 </html>
