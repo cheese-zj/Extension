@@ -13,7 +13,160 @@ const settingsBtn = document.getElementById("settings-btn");
 const settingsOverlay = document.getElementById("settings-overlay");
 const settingsClose = document.getElementById("settings-close");
 
+// Settings elements
+const settingTheme = document.getElementById("setting-theme");
+const settingCompact = document.getElementById("setting-compact");
+const settingTimestamps = document.getElementById("setting-timestamps");
+const settingPreviewLength = document.getElementById("setting-preview-length");
+const previewLengthValue = document.getElementById("preview-length-value");
+const segmentedBtns = document.querySelectorAll(".segmented-btn");
+
 let activeTabId = null;
+let refreshDebounceTimer = null;
+let lastStatusState = null;
+let isRefreshing = false;
+
+// ============================================
+// Settings
+// ============================================
+
+const SETTINGS_KEY = "branchTreeSettings";
+
+const DEFAULT_SETTINGS = {
+  previewLength: 70,
+  timestampFormat: "absolute", // "absolute" | "relative"
+  showTimestamps: true,
+  theme: "system", // "system" | "dark" | "light"
+  compactMode: false,
+};
+
+// Current settings (loaded on init)
+let currentSettings = { ...DEFAULT_SETTINGS };
+
+async function loadSettings() {
+  try {
+    const data = await chrome.storage.local.get(SETTINGS_KEY);
+    currentSettings = { ...DEFAULT_SETTINGS, ...(data?.[SETTINGS_KEY] || {}) };
+  } catch (e) {
+    currentSettings = { ...DEFAULT_SETTINGS };
+  }
+  applySettings();
+  updateSettingsUI();
+}
+
+async function saveSettings() {
+  try {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: currentSettings });
+  } catch (e) {
+    console.error("Failed to save settings:", e);
+  }
+}
+
+function applySettings() {
+  // Apply theme
+  document.body.classList.remove("theme-dark", "theme-light");
+  if (currentSettings.theme === "dark") {
+    document.body.classList.add("theme-dark");
+  } else if (currentSettings.theme === "light") {
+    document.body.classList.add("theme-light");
+  }
+  
+  // Apply compact mode
+  document.body.classList.toggle("compact-mode", currentSettings.compactMode);
+}
+
+function updateSettingsUI() {
+  // Theme dropdown
+  if (settingTheme) {
+    settingTheme.value = currentSettings.theme;
+  }
+  
+  // Compact mode toggle
+  if (settingCompact) {
+    settingCompact.checked = currentSettings.compactMode;
+  }
+  
+  // Show timestamps toggle
+  if (settingTimestamps) {
+    settingTimestamps.checked = currentSettings.showTimestamps;
+  }
+  
+  // Timestamp format segmented control
+  segmentedBtns.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.value === currentSettings.timestampFormat);
+  });
+  
+  // Preview length slider
+  if (settingPreviewLength) {
+    settingPreviewLength.value = currentSettings.previewLength;
+  }
+  if (previewLengthValue) {
+    previewLengthValue.textContent = currentSettings.previewLength;
+  }
+}
+
+function setupSettingsListeners() {
+  // Theme change
+  if (settingTheme) {
+    settingTheme.addEventListener("change", () => {
+      currentSettings.theme = settingTheme.value;
+      applySettings();
+      saveSettings();
+    });
+  }
+  
+  // Compact mode toggle
+  if (settingCompact) {
+    settingCompact.addEventListener("change", () => {
+      currentSettings.compactMode = settingCompact.checked;
+      applySettings();
+      saveSettings();
+    });
+  }
+  
+  // Show timestamps toggle
+  if (settingTimestamps) {
+    settingTimestamps.addEventListener("change", () => {
+      currentSettings.showTimestamps = settingTimestamps.checked;
+      saveSettings();
+      refresh(); // Re-render tree with new setting
+    });
+  }
+  
+  // Timestamp format segmented control
+  segmentedBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      segmentedBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentSettings.timestampFormat = btn.dataset.value;
+      saveSettings();
+      refresh(); // Re-render tree with new format
+    });
+  });
+  
+  // Preview length slider
+  if (settingPreviewLength) {
+    settingPreviewLength.addEventListener("input", () => {
+      const value = parseInt(settingPreviewLength.value, 10);
+      currentSettings.previewLength = value;
+      if (previewLengthValue) {
+        previewLengthValue.textContent = value;
+      }
+    });
+    
+    // Save on change (when user releases slider)
+    settingPreviewLength.addEventListener("change", () => {
+      saveSettings();
+      refresh(); // Re-render tree with new length
+    });
+  }
+}
+
+// Store node data for event delegation (avoids closure memory leaks)
+const nodeDataMap = new Map();
+
+// Track if global listeners are already registered (prevent duplicates)
+let globalListenersRegistered = false;
 
 // ============================================
 // Color Palette
@@ -163,32 +316,82 @@ function getBranchColor(colorIndex) {
 // Utilities
 // ============================================
 
-function truncate(text, max = 80) {
+function truncate(text, max = null) {
   if (!text) return "";
+  const limit = max ?? currentSettings.previewLength ?? 70;
   const clean = text.trim().replace(/\s+/g, " ");
-  return clean.length <= max ? clean : clean.slice(0, max - 1) + "…";
+  return clean.length <= limit ? clean : clean.slice(0, limit - 1) + "…";
+}
+
+/**
+ * Format a relative time string (e.g., "2h ago", "3d ago")
+ */
+function formatRelativeTime(ms) {
+  const now = Date.now();
+  const diff = now - ms;
+  
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  
+  if (months > 0) return `${months}mo ago`;
+  if (weeks > 0) return `${weeks}w ago`;
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "just now";
 }
 
 function formatTimestamp(ts) {
   if (!ts || ts <= 0) return "";
+  if (!currentSettings.showTimestamps) return "";
+  
   const ms = ts > 1e12 ? ts : ts * 1000;
   const date = new Date(ms);
+  
+  if (currentSettings.timestampFormat === "relative") {
+    return formatRelativeTime(ms);
+  }
+  
+  // Absolute format
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const day = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   return `${time} · ${day}`;
 }
 
+let statusResetTimer = null;
+let statusResetGeneration = 0; // Guard against stale timer callbacks
+
 function setStatus(text, state = "ready") {
+  // Skip if same state (avoid flicker)
+  if (lastStatusState === state && state !== "loading") {
+    return;
+  }
+  
+  clearTimeout(statusResetTimer);
+  statusResetTimer = null;
+  statusResetGeneration++;
+  const currentGeneration = statusResetGeneration;
+  
+  lastStatusState = state;
   statusEl.textContent = text;
   statusDot.classList.remove("loading", "success");
+  
   if (state === "loading") {
     statusDot.classList.add("loading");
   } else if (state === "success") {
     statusDot.classList.add("success");
-    // Reset to ready after 2 seconds
-    setTimeout(() => {
-      statusDot.classList.remove("success");
-    }, 2000);
+    // Reset to ready after 1.5 seconds (with guard)
+    statusResetTimer = setTimeout(() => {
+      // Guard: only execute if this is still the current timer
+      if (currentGeneration === statusResetGeneration) {
+        statusDot.classList.remove("success");
+        lastStatusState = "ready";
+      }
+    }, 1500);
   }
 }
 
@@ -221,6 +424,12 @@ async function getActiveTab() {
 function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   const { id, type, role, text, depth, hasChildren, childCount, targetConversationId, createTime, colorIndex, branchIndex, expanded, isCurrent, isCurrentPath, isViewing, branchPath, isTerminal } = node;
   
+  // Helper to fetch the rendered row element for a node (by id) if already in DOM
+  function prevNodeRow(n) {
+    if (!n) return null;
+    return treeRoot.querySelector(`[data-node-id="${n.id}"]`);
+  }
+
   const row = document.createElement("div");
   row.className = "tree-node";
   row.dataset.nodeId = id;
@@ -236,6 +445,8 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   const isExpanded = expanded === true;
   const isFirst = index === 0;
   const isLast = index === total - 1;
+  const hasBranchLabel = isBranch || isBranchRoot;
+  const isMessageCard = !isTitle && !hasBranchLabel;
   
   if (isBranch) row.classList.add("is-branch");
   if (isBranchRoot) row.classList.add("is-branch-root");
@@ -266,6 +477,9 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   // Check what's around us - for T-junction logic
   const nextIsBranch = nextNode?.type === "branch";
   const prevIsBranch = prevNode?.type === "branch";
+  const prevBranchContinues = prevIsBranch
+    ? findMainLineContinuation(allNodes, index - 1, prevNode.depth ?? 0)
+    : false;
   
   // Determine if this node should connect to the next node
   // A node connects below if:
@@ -295,6 +509,7 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   const showAbove = !isFirst && !isBranch && (
     prevHasSameContext || 
     prevIsExpandedBranch ||
+    prevBranchContinues ||
     prevNode?.type === "title" || 
     prevNode?.type === "ancestor-title" || 
     prevNode?.type === "current-title"
@@ -310,16 +525,11 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   rail.style.setProperty("--depth", depth ?? 0);
   rail.style.setProperty("--color", color);
 
-  // Vertical lines for depth indentation
+  // Vertical lines for depth indentation (colored per level)
   for (let i = 0; i < (depth ?? 0); i++) {
     const line = document.createElement("span");
     line.className = "rail-line";
-    // For branch content, hide ALL rail-lines to show grey backbones
-    if (hasColorIndex) {
-      line.classList.add("hidden-line");
-    } else {
-      line.style.setProperty("--line-color", getColor(i));
-    }
+    line.style.setProperty("--line-color", getColor(i));
     rail.appendChild(line);
   }
 
@@ -341,7 +551,15 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
       connector.classList.add("main-continues");
     }
     // Set the main line color for the T-junction
-    const mainColor = getColor(depth ?? 0);
+    // Use the parent/main-line color for the T junction; prefer previous non-branch color if available
+    let prevColor = null;
+    if (prevNode && prevNode.type !== "branch" && prevNode.type !== "nested-branch") {
+      const prevEl = prevNodeRow(prevNode);
+      if (prevEl) {
+        prevColor = getComputedStyle(prevEl).getPropertyValue("--color")?.trim() || null;
+      }
+    }
+    const mainColor = prevColor || getColor(depth ?? 0);
     connector.style.setProperty("--main-color", mainColor);
   } else {
     if (showAbove) connector.classList.add("has-above");
@@ -370,6 +588,7 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   if (isAncestorTitle) card.classList.add("ancestor-card");
   if (isCurrentTitle) card.classList.add("current-card");
   if (isExpanded) card.classList.add("expanded-card");
+  if (isMessageCard) card.classList.add("message-card");
 
   // For title nodes, show the title text with optional label
   if (isTitle) {
@@ -396,65 +615,86 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
     card.appendChild(titleText);
   } else {
     // Compact header: label + timestamp inline
-    const header = document.createElement("div");
-    header.className = "card-header";
-
-    const label = document.createElement("span");
-    label.className = "card-label";
-    if (type === "branch") {
-      // Use hierarchical branch path (e.g., "1", "1.1", "1.1.1")
-      const pathLabel = branchPath || `${(branchIndex ?? 0) + 1}`;
-      if (isViewing) {
-        // Show "Viewing X.X" for the branch leading to current conversation
-        label.textContent = `Viewing ${pathLabel}`;
-        label.classList.add("label-viewing");
-      } else if (isExpanded) {
-        label.textContent = `Branch ${pathLabel}`;
-        label.classList.add("label-expanded");
-      } else {
-        label.textContent = `Branch ${pathLabel}`;
-      }
-      label.classList.add("label-branch");
-    } else if (type === "branchRoot") {
-      label.textContent = "From";
-      label.classList.add("label-branch-root");
-    } else {
-      label.textContent = "You";
-      label.classList.add("label-user");
-    }
-    header.appendChild(label);
-
-    // Timestamp on the right
     const timestamp = formatTimestamp(createTime);
-    if (timestamp) {
-      const timeEl = document.createElement("span");
-      timeEl.className = "card-time";
-      timeEl.textContent = timestamp;
-      header.appendChild(timeEl);
-    }
+    const hasTimestamp = Boolean(timestamp);
+    const needsHeader = hasBranchLabel || hasTimestamp;
 
-    card.appendChild(header);
+    if (needsHeader) {
+      const header = document.createElement("div");
+      header.className = "card-header";
+      if (isMessageCard) header.classList.add("message-header");
+
+      // Only show labels for branches and branchRoots, not regular messages
+      if (type === "branch" || type === "branchRoot") {
+        const label = document.createElement("span");
+        label.className = "card-label";
+        if (type === "branch") {
+          // Use hierarchical branch path (e.g., "1", "1.1", "1.1.1")
+          const pathLabel = branchPath || `${(branchIndex ?? 0) + 1}`;
+          if (isViewing) {
+            // Show "Viewing" tag; branch number is shown on its own line below
+            label.textContent = "Viewing";
+            label.classList.add("label-viewing");
+          } else if (isExpanded) {
+            label.textContent = `Branch ${pathLabel}`;
+            label.classList.add("label-expanded");
+          } else {
+            label.textContent = `Branch ${pathLabel}`;
+          }
+          label.classList.add("label-branch");
+        } else {
+          label.textContent = "From";
+          label.classList.add("label-branch-root");
+        }
+        header.appendChild(label);
+      }
+
+      // Timestamp on the right
+      if (hasTimestamp) {
+        const timeEl = document.createElement("span");
+        timeEl.className = "card-time";
+        if (isMessageCard) timeEl.classList.add("card-time-compact");
+        timeEl.textContent = timestamp;
+        header.appendChild(timeEl);
+      }
+
+      card.appendChild(header);
+    }
 
     // Text preview - only show if there's actual content
     // Don't show preview for viewing branch (first message will appear below)
-    const trimmedText = truncate(text, 70);
+    const trimmedText = truncate(text);
     if (trimmedText && !isViewing) {
       const preview = document.createElement("div");
       preview.className = "card-preview";
+      if (isMessageCard) preview.classList.add("message-preview");
       preview.textContent = trimmedText;
       card.appendChild(preview);
+    }
+
+    // For viewing branch, show branch number on its own line for clarity
+    if (type === "branch" && isViewing) {
+      const pathLabel = branchPath || `${(branchIndex ?? 0) + 1}`;
+      const branchLine = document.createElement("div");
+      branchLine.className = "branch-path-line";
+      branchLine.textContent = `Branch ${pathLabel}`;
+      card.appendChild(branchLine);
     }
   }
 
   row.appendChild(card);
 
-  // Store full text for tooltip
+  // Store full text for tooltip (in dataset for event delegation)
   row.dataset.fullText = text || "";
   row.dataset.type = type || "message";
   row.dataset.targetConv = targetConversationId || "";
 
-  // Click handler
-  row.addEventListener("click", () => handleNodeClick(node));
+  // Store node data in Map for event delegation (avoids closure memory leaks)
+  nodeDataMap.set(id, {
+    id,
+    type,
+    targetConversationId,
+  });
 
   return row;
 }
@@ -506,13 +746,16 @@ function createNestedBranchElement(node, parentColorIndex, isFirst = false, isLa
   rail.className = "rail nested-rail";
   rail.style.setProperty("--depth", depth ?? 0);
 
-  // Depth indentation lines:
-  // Hide ALL rail-lines for nested branch elements - grey backbones provide visual guide
+  // Depth indentation lines: use parent color and highlight parent column when continuing
+  const branchColumnIndex = Math.max((depth ?? 1) - 1, 0);
   for (let i = 0; i < (depth ?? 0); i++) {
     const line = document.createElement("span");
     line.className = "rail-line nested-rail-line";
-    // Hide all rail-lines to show grey backbones
-    line.classList.add("hidden-line");
+    line.style.setProperty("--line-color", parentColor);
+    if (mainLineContinues && i === branchColumnIndex) {
+      line.classList.add("main-line");
+      line.style.setProperty("--line-color", parentColor);
+    }
     rail.appendChild(line);
   }
 
@@ -559,22 +802,24 @@ function createNestedBranchElement(node, parentColorIndex, isFirst = false, isLa
 
   row.appendChild(card);
 
-  // Store data for tooltip and click handling
+  // Store data for tooltip and click handling (in dataset for event delegation)
   row.dataset.fullText = text || "";
   row.dataset.type = "nested-branch";
   row.dataset.targetConv = targetConversationId || "";
 
-  // Click handler - navigate to conversation
-  row.addEventListener("click", () => handleNodeClick({
+  // Store node data in Map for event delegation (avoids closure memory leaks)
+  nodeDataMap.set(id, {
     id,
-    type: "branch",
+    type: "branch", // Nested branches navigate like regular branches
     targetConversationId,
-  }));
+  });
 
   return row;
 }
 
 function renderTree(nodes, title, hasAncestry = false) {
+  // Clear previous node data to prevent memory leaks
+  nodeDataMap.clear();
   treeRoot.innerHTML = "";
 
   // Filter out nodes with empty text (keep branches, branchRoots, and title types)
@@ -615,33 +860,32 @@ function renderTree(nodes, title, hasAncestry = false) {
   }
   allNodes.push(...filteredNodes);
 
+  // For root view (no ancestry), inline nested branch previews as regular branch nodes
+  if (!hasAncestry) {
+    const expandedNodes = [];
+    allNodes.forEach((node) => {
+      expandedNodes.push(node);
+      if (node.type === "branch" && !node.expanded && node.nestedBranches?.length > 0) {
+        node.nestedBranches.forEach((nested) => {
+          expandedNodes.push({
+            ...nested,
+            type: "branch",
+            expanded: false,
+            isNestedInline: true,
+          });
+        });
+      }
+    });
+    allNodes.length = 0;
+    allNodes.push(...expandedNodes);
+  }
+
   // Mark terminal nodes before rendering
   markTerminalNodes(allNodes);
 
-  // Calculate max depth for backbone lines (including nested branches)
-  let maxDepth = 0;
-  allNodes.forEach(node => {
-    maxDepth = Math.max(maxDepth, node.depth ?? 0);
-    // Check nested branches for deeper depths
-    if (node.nestedBranches) {
-      node.nestedBranches.forEach(nested => {
-        maxDepth = Math.max(maxDepth, nested.depth ?? 0);
-      });
-    }
-  });
-
-  // Create grey backbone lines for each depth column
-  const railSize = 20; // var(--rail-size) = 20px
-  for (let d = 0; d <= maxDepth; d++) {
-    const backbone = document.createElement("div");
-    backbone.className = "tree-backbone";
-    // Position at center of each column: (d * railSize) + (railSize / 2)
-    backbone.style.left = `${(d * railSize) + (railSize / 2) - 1.2}px`;
-    treeRoot.appendChild(backbone);
-  }
-
   const fragment = document.createDocumentFragment();
   let visualIndex = 0; // Track visual position for staggered animation
+  const renderNestedPreviews = hasAncestry;
   allNodes.forEach((node, idx) => {
     const prevNode = idx > 0 ? allNodes[idx - 1] : null;
     const nextNode = idx < allNodes.length - 1 ? allNodes[idx + 1] : null;
@@ -649,7 +893,7 @@ function renderTree(nodes, title, hasAncestry = false) {
     visualIndex++;
     
     // If this is a collapsed branch with nested branches, render them
-    if (node.type === "branch" && !node.expanded && node.nestedBranches?.length > 0) {
+    if (renderNestedPreviews && node.type === "branch" && !node.expanded && node.nestedBranches?.length > 0) {
       // Check if main line continues after this branch and its nested branches
       const mainLineContinues = findMainLineContinuation(allNodes, idx, node.depth ?? 0);
       
@@ -670,23 +914,86 @@ function renderTree(nodes, title, hasAncestry = false) {
     }
   });
   treeRoot.appendChild(fragment);
+
+  // Draw colored backbones per depth to bridge gaps (stops at last node)
+  drawBackbones();
+}
+
+/**
+ * Draw small backbone segments only across vertical gaps between nodes of the same depth.
+ * Keeps the existing node connectors untouched and only fills missing segments.
+ */
+function drawBackbones() {
+  // Remove existing backbones
+  treeRoot.querySelectorAll(".tree-backbone").forEach(el => el.remove());
+
+  const nodes = Array.from(treeRoot.querySelectorAll(".tree-node"));
+  if (nodes.length === 0) return;
+
+  const rootRect = treeRoot.getBoundingClientRect();
+  const railSize = 20; // matches --rail-size
+
+  // Group nodes by depth with their rects (exclude only nested previews)
+  const nodesByDepth = new Map();
+  nodes.forEach(node => {
+    const type = node.dataset.type || "";
+    // Skip nested branch previews; they have their own mini rails
+    if (type === "nested-branch") return;
+
+    const depth = parseInt(node.dataset.depth || "0", 10);
+    const rect = node.getBoundingClientRect();
+    const entry = nodesByDepth.get(depth) || [];
+    entry.push({ node, rect });
+    nodesByDepth.set(depth, entry);
+  });
+
+  nodesByDepth.forEach((list, depth) => {
+    // Sort by vertical position
+    list.sort((a, b) => a.rect.top - b.rect.top);
+    for (let i = 0; i < list.length - 1; i++) {
+      const current = list[i];
+      const next = list[i + 1];
+      const gap = next.rect.top - current.rect.bottom;
+
+      // Only fill meaningful gaps (skip near-adjacent nodes)
+      if (gap <= 4) continue;
+
+      const backbone = document.createElement("div");
+      backbone.className = "tree-backbone";
+
+      // Prefer the node's color (branch/main), fallback to depth color
+      const colorVar = getComputedStyle(current.node).getPropertyValue("--color")?.trim();
+      backbone.style.background = colorVar || getColor(depth);
+
+      backbone.style.left = `${(depth * railSize) + (railSize / 2) - 1}px`;
+      // Overlap both ends to ensure connection into adjoining connectors
+      const top = current.rect.bottom - rootRect.top - 6;
+      const height = gap + 30;
+      backbone.style.top = `${top}px`;
+      backbone.style.height = `${height}px`;
+      treeRoot.appendChild(backbone);
+    }
+  });
 }
 
 // ============================================
-// Tooltip
+// Tooltip & Event Delegation
 // ============================================
 
 let tooltipTimer = null;
+let tooltipGeneration = 0; // Guard against stale timer callbacks
 
 function showTooltip(el, text, type) {
   clearTimeout(tooltipTimer);
+  tooltipTimer = null;
+  tooltipGeneration++;
   
   const rect = el.getBoundingClientRect();
   const containerRect = treeRoot.getBoundingClientRect();
   
   tooltip.textContent = text || "(empty message)";
   tooltip.className = "tooltip visible";
-  if (type === "branch") tooltip.classList.add("tooltip-branch");
+  if (type === "branch" || type === "nested-branch") tooltip.classList.add("tooltip-branch");
   
   // Position tooltip
   const top = rect.top - containerRect.top + treeRoot.scrollTop;
@@ -696,22 +1003,45 @@ function showTooltip(el, text, type) {
 }
 
 function hideTooltip() {
+  tooltipGeneration++;
+  const currentGeneration = tooltipGeneration;
+  
   tooltipTimer = setTimeout(() => {
-    tooltip.classList.remove("visible");
+    // Guard: only execute if this is still the current timer
+    if (currentGeneration === tooltipGeneration) {
+      tooltip.classList.remove("visible");
+    }
   }, 100);
 }
 
-treeRoot.addEventListener("mouseover", (e) => {
-  const node = e.target.closest(".tree-node");
-  if (node) {
-    showTooltip(node, node.dataset.fullText, node.dataset.type);
-  }
-});
+// Delegated event handlers for tree nodes (single handler for all nodes)
+function setupTreeEventDelegation() {
+  // Mouse events for tooltip
+  treeRoot.addEventListener("mouseover", (e) => {
+    const node = e.target.closest(".tree-node");
+    if (node) {
+      showTooltip(node, node.dataset.fullText, node.dataset.type);
+    }
+  });
 
-treeRoot.addEventListener("mouseout", (e) => {
-  const node = e.target.closest(".tree-node");
-  if (node) hideTooltip();
-});
+  treeRoot.addEventListener("mouseout", (e) => {
+    const node = e.target.closest(".tree-node");
+    if (node) hideTooltip();
+  });
+
+  // Click handler using event delegation (no closure memory leaks)
+  treeRoot.addEventListener("click", (e) => {
+    const node = e.target.closest(".tree-node");
+    if (!node) return;
+    
+    const nodeId = node.dataset.nodeId;
+    const nodeData = nodeDataMap.get(nodeId);
+    
+    if (nodeData) {
+      handleNodeClick(nodeData);
+    }
+  });
+}
 
 // ============================================
 // Actions
@@ -776,13 +1106,18 @@ async function fetchTree(tab = null) {
 }
 
 async function refresh() {
+  // Prevent concurrent refreshes
+  if (isRefreshing) return;
+  isRefreshing = true;
   refreshBtn.disabled = true;
+  
   const tab = await getActiveTab();
   
   if (!tab?.id || !isChatUrl(tab.url)) {
     treeRoot.innerHTML = "";
     setStatus("Open a ChatGPT conversation");
     refreshBtn.disabled = false;
+    isRefreshing = false;
     return;
   }
 
@@ -791,6 +1126,18 @@ async function refresh() {
     renderTree(data.nodes, data.title, data.hasAncestry);
   }
   refreshBtn.disabled = false;
+  isRefreshing = false;
+}
+
+// Debounced refresh for automatic triggers with additional race protection
+function debouncedRefresh() {
+  clearTimeout(refreshDebounceTimer);
+  refreshDebounceTimer = setTimeout(() => {
+    // Double-check we're not already refreshing when timer fires
+    if (!isRefreshing) {
+      refresh();
+    }
+  }, 300);
 }
 
 // ============================================
@@ -806,69 +1153,93 @@ function closeSettings() {
   settingsOverlay.classList.remove("visible");
 }
 
-settingsBtn.addEventListener("click", openSettings);
-settingsClose.addEventListener("click", closeSettings);
-
-// Close settings when clicking overlay background
-settingsOverlay.addEventListener("click", (e) => {
-  if (e.target === settingsOverlay) {
-    closeSettings();
-  }
-});
-
-// Close settings on Escape key
-document.addEventListener("keydown", (e) => {
+// Escape key handler (stored reference to avoid accumulation)
+function handleEscapeKey(e) {
   if (e.key === "Escape" && settingsOverlay.classList.contains("visible")) {
     closeSettings();
   }
-});
-
-refreshBtn.addEventListener("click", () => {
-  closeSettings();
-  refresh();
-});
-
-// Clear all branch data
-clearDataBtn.addEventListener("click", async () => {
-  if (confirm("Clear all branch tracking data? This cannot be undone.")) {
-    await chrome.storage.local.remove("chatgpt_branch_data");
-    await chrome.storage.local.remove("pendingBranch");
-    setStatus("Data cleared", "success");
-    closeSettings();
-    refresh();
-  }
-});
-
-// Listen for updates from content script
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "TREE_UPDATED" && msg.nodes) {
-    renderTree(msg.nodes, msg.title, msg.hasAncestry);
-    setStatus("Updated", "success");
-  }
-});
-
-// Tab change detection
-if (chrome.tabs?.onActivated) {
-  chrome.tabs.onActivated.addListener((info) => {
-    activeTabId = info.tabId;
-    setTimeout(refresh, 100);
-  });
 }
 
-if (chrome.tabs?.onUpdated) {
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (tabId === activeTabId && (changeInfo.status === "complete" || changeInfo.url)) {
-      setTimeout(refresh, 100);
+// Setup all global event listeners (called once on init)
+function setupGlobalListeners() {
+  // Prevent duplicate registration
+  if (globalListenersRegistered) return;
+  globalListenersRegistered = true;
+
+  // Settings button handlers
+  settingsBtn.addEventListener("click", openSettings);
+  settingsClose.addEventListener("click", closeSettings);
+
+  // Close settings when clicking overlay background
+  settingsOverlay.addEventListener("click", (e) => {
+    if (e.target === settingsOverlay) {
+      closeSettings();
     }
   });
+
+  // Close settings on Escape key (single listener)
+  document.addEventListener("keydown", handleEscapeKey);
+
+  // Refresh button
+  refreshBtn.addEventListener("click", () => {
+    closeSettings();
+    refresh();
+  });
+
+  // Clear all branch data
+  clearDataBtn.addEventListener("click", async () => {
+    if (confirm("Clear all branch tracking data? This cannot be undone.")) {
+      await chrome.storage.local.remove("chatgpt_branch_data");
+      await chrome.storage.local.remove("pendingBranch");
+      setStatus("Data cleared", "success");
+      closeSettings();
+      refresh();
+    }
+  });
+
+  // Listen for updates from content script
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === "TREE_UPDATED" && msg.nodes) {
+      renderTree(msg.nodes, msg.title, msg.hasAncestry);
+      setStatus("Updated", "success");
+    }
+  });
+
+  // Tab change detection
+  if (chrome.tabs?.onActivated) {
+    chrome.tabs.onActivated.addListener((info) => {
+      activeTabId = info.tabId;
+      debouncedRefresh();
+    });
+  }
+
+  if (chrome.tabs?.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      if (tabId === activeTabId && (changeInfo.status === "complete" || changeInfo.url)) {
+        debouncedRefresh();
+      }
+    });
+  }
+
+  // Visibility change
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      debouncedRefresh();
+    }
+  });
+
+  // Setup tree event delegation (clicks and tooltips)
+  setupTreeEventDelegation();
+  
+  // Setup settings listeners
+  setupSettingsListeners();
 }
 
-// Visibility change
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
-    refresh();
-  }
-});
+// Initialize
+async function init() {
+  await loadSettings();
+  setupGlobalListeners();
+  refresh();
+}
 
-// Initial load
-refresh();
+init();

@@ -8,6 +8,39 @@
   const HIGHLIGHT_CLASS = "branch-tree-highlight";
   const PANEL_ID = "branch-tree-panel";
   const PANEL_STATE_KEY = "branchPanelOpen";
+  const CACHE_TTL_MS = 30000; // 30 second cache TTL for conversations
+  const OBSERVER_THROTTLE_MS = 500; // Throttle observer callbacks
+
+  // ============================================
+  // Conversation Cache
+  // ============================================
+
+  // Simple cache for fetched conversations with TTL
+  const conversationCache = new Map();
+
+  function getCachedConversation(conversationId) {
+    const cached = conversationCache.get(conversationId);
+    if (!cached) return null;
+    
+    // Check if cache entry has expired
+    if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+      conversationCache.delete(conversationId);
+      return null;
+    }
+    
+    return cached.data;
+  }
+
+  function setCachedConversation(conversationId, data) {
+    conversationCache.set(conversationId, {
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  function clearConversationCache() {
+    conversationCache.clear();
+  }
 
   // ============================================
   // API & Data Fetching
@@ -32,14 +65,28 @@
     return data.accessToken;
   }
 
-  async function fetchConversation(conversationId) {
+  async function fetchConversation(conversationId, useCache = true) {
+    // Check cache first (unless explicitly disabled)
+    if (useCache) {
+      const cached = getCachedConversation(conversationId);
+      if (cached) {
+        console.log("[BranchTree] Using cached conversation:", conversationId);
+        return cached;
+      }
+    }
+
     const token = await getAccessToken();
     const res = await fetch(`${getBaseUrl()}/backend-api/conversation/${conversationId}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       credentials: "include",
     });
     if (!res.ok) throw new Error(`Conversation fetch failed: ${res.status}`);
-    return res.json();
+    const data = await res.json();
+    
+    // Cache the result
+    setCachedConversation(conversationId, data);
+    
+    return data;
   }
 
   // ============================================
@@ -55,8 +102,17 @@
     await chrome.storage.local.set({ [STORAGE_KEY]: data });
   }
 
-  async function recordBranch(parentConvId, childConvId, childTitle, branchTimestamp, firstMessage) {
-    const data = await loadBranchData();
+  /**
+   * Record a branch relationship
+   * @param parentConvId - Parent conversation ID
+   * @param childConvId - Child conversation ID  
+   * @param childTitle - Title of child conversation
+   * @param branchTimestamp - Timestamp when branch was created
+   * @param firstMessage - First user message in branch
+   * @param existingData - Optional existing branch data to avoid re-loading
+   */
+  async function recordBranch(parentConvId, childConvId, childTitle, branchTimestamp, firstMessage, existingData = null) {
+    const data = existingData || await loadBranchData();
     if (!data.branches[parentConvId]) data.branches[parentConvId] = [];
     
     const exists = data.branches[parentConvId].some((b) => b.childId === childConvId);
@@ -527,7 +583,7 @@
       );
     });
     
-    // Add current items sorted chronologically
+    // Add current items sorted chronologically (branches + messages)
     const currentItems = [...currentMessages, ...currentBranchNodes].sort(
       (a, b) => toSeconds(a.createTime) - toSeconds(b.createTime)
     );
@@ -539,10 +595,10 @@
     if (allPostBranchItems.length > 0) {
       // Sort by creation time to maintain chronological order
       allPostBranchItems.sort((a, b) => toSeconds(a.createTime) - toSeconds(b.createTime));
-      // Clear colorIndex for post-branch items - they're back on the main line
+      // For root depth (0), return to main line color; otherwise keep branch color
       const mainLineItems = allPostBranchItems.map(item => ({
         ...item,
-        colorIndex: undefined, // Return to main line color
+        colorIndex: item.depth === 0 ? undefined : (item.colorIndex ?? currentColorIndex),
         isPostBranch: true, // Mark for debugging
       }));
       result.push(...mainLineItems);
@@ -777,7 +833,15 @@
     }
   }, true);
 
-  async function checkPendingBranch(currentConvId, currentTitle, mapping) {
+  /**
+   * Check and process pending branch creation
+   * @param currentConvId - Current conversation ID
+   * @param currentTitle - Current conversation title
+   * @param mapping - Current conversation mapping
+   * @param branchData - Pre-loaded branch data to avoid re-loading
+   * @returns Updated branch data if modified, null otherwise
+   */
+  async function checkPendingBranch(currentConvId, currentTitle, mapping, branchData) {
     const data = await chrome.storage.local.get("pendingBranch");
     const pending = data?.pendingBranch;
     if (!pending) return null;
@@ -809,12 +873,19 @@
     console.log("[BranchTree] First unique message for branch:", firstMessage?.slice(0, 30));
 
     // Record the branch relationship with the timestamp when branch was clicked
-    // Pass timestamp already in seconds
-    await recordBranch(pending.parentId, currentConvId, currentTitle, pending.timestamp * 1000, firstMessage);
+    // Pass existing branchData to avoid re-loading
+    const updatedData = await recordBranch(
+      pending.parentId, 
+      currentConvId, 
+      currentTitle, 
+      pending.timestamp * 1000, 
+      firstMessage,
+      branchData
+    );
     await chrome.storage.local.remove("pendingBranch");
     
     console.log("[BranchTree] Consumed pending branch:", pending);
-    return pending;
+    return updatedData;
   }
 
   // ============================================
@@ -848,10 +919,11 @@
     Object.assign(frame.style, {
       width: "100%",
       height: "100%",
-      border: "none",
+      border: "1px solid rgba(128, 128, 128, 0.2)",
+      borderRight: "none",
       pointerEvents: "auto",
-      borderRadius: "16px 0 0 16px",
-      boxShadow: "-4px 0 32px rgba(0,0,0,0.25)",
+      borderRadius: "12px 0 0 12px",
+      boxShadow: "none",
     });
 
     // Toggle button
@@ -862,19 +934,19 @@
       position: "fixed",
       right: "16px",
       bottom: "16px",
-      width: "48px",
-      height: "48px",
+      width: "44px",
+      height: "44px",
       borderRadius: "50%",
-      border: "none",
-      background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+      border: "1px solid rgba(99, 102, 241, 0.3)",
+      background: "#6366f1",
       color: "#fff",
       cursor: "pointer",
-      boxShadow: "0 4px 16px rgba(99, 102, 241, 0.4)",
+      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
       zIndex: "2147483647",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      transition: "transform 0.2s, box-shadow 0.2s",
+      transition: "transform 0.2s, background 0.2s",
       pointerEvents: "auto",
     });
 
@@ -929,18 +1001,25 @@
     }
 
     try {
-      const conv = await fetchConversation(conversationId);
+      // Fetch current conversation (may use cache for current conv)
+      const conv = await fetchConversation(conversationId, false); // Don't cache current conv to get fresh data
       const title = conv.title || "Conversation";
       
-      // Check for pending branch (pass mapping for first message extraction)
-      await checkPendingBranch(conversationId, title, conv.mapping);
+      // Load branch data ONCE at the start
+      let branchData = await loadBranchData();
       
-      // Load branch data and build display list
-      const branchData = await loadBranchData();
+      // Check for pending branch (pass branchData to avoid re-loading)
+      const updatedData = await checkPendingBranch(conversationId, title, conv.mapping, branchData);
+      if (updatedData) {
+        branchData = updatedData; // Use updated data if branch was recorded
+      }
+      
+      // Update title in branch data
       branchData.titles[conversationId] = title;
       await saveBranchData(branchData);
 
       // Check if this conversation has ancestors (is a child branch)
+      // Pass branchData to avoid re-loading in ancestry chain
       const ancestryChain = await fetchAncestryChain(conversationId, branchData);
       
       let nodes;
@@ -1001,6 +1080,7 @@
 
   let refreshTimer = null;
   let isRefreshing = false;
+  let lastObserverTrigger = 0; // For throttling
 
   async function refreshTree() {
     if (isRefreshing) return;
@@ -1023,15 +1103,77 @@
 
   function scheduleRefresh(delay = 800) {
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refreshTree, delay);
+    refreshTimer = setTimeout(() => {
+      // Double-check we're not already refreshing when timer fires
+      if (!isRefreshing) {
+        refreshTree();
+      }
+    }, delay);
   }
 
-  // Watch for DOM changes
+  // Throttled schedule refresh (for MutationObserver)
+  function throttledScheduleRefresh() {
+    const now = Date.now();
+    if (now - lastObserverTrigger < OBSERVER_THROTTLE_MS) {
+      return; // Skip if called too recently
+    }
+    lastObserverTrigger = now;
+    scheduleRefresh();
+  }
+
+  /**
+   * Check if a mutation is relevant to conversation content
+   * Filters out mutations that are unlikely to affect the tree
+   */
+  function isRelevantMutation(mutation) {
+    // Check if mutation target or added nodes are in conversation area
+    const target = mutation.target;
+    
+    // Ignore mutations in our own panel
+    if (target.id === PANEL_ID || target.closest?.(`#${PANEL_ID}`)) {
+      return false;
+    }
+    
+    // Ignore mutations in scroll indicators, tooltips, etc.
+    const ignoredClasses = ['tooltip', 'popover', 'scroll', 'cursor'];
+    const targetClasses = target.className || '';
+    if (typeof targetClasses === 'string') {
+      for (const cls of ignoredClasses) {
+        if (targetClasses.toLowerCase().includes(cls)) {
+          return false;
+        }
+      }
+    }
+    
+    // Check if mutation involves message-related elements
+    for (const node of mutation.addedNodes) {
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      
+      // Look for message containers or conversation turns
+      if (node.matches?.('[data-message-id]') ||
+          node.matches?.('[data-testid*="conversation"]') ||
+          node.querySelector?.('[data-message-id]')) {
+        return true;
+      }
+    }
+    
+    // For significant structural changes, still trigger refresh
+    if (mutation.addedNodes.length > 3 || mutation.removedNodes.length > 3) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Watch for DOM changes with throttling and filtering
   const observer = new MutationObserver((mutations) => {
+    // Check if any mutation is relevant
     for (const m of mutations) {
       if (m.addedNodes.length || m.removedNodes.length) {
-        scheduleRefresh();
-        break;
+        if (isRelevantMutation(m)) {
+          throttledScheduleRefresh();
+          return; // Only need to trigger once
+        }
       }
     }
   });
@@ -1043,7 +1185,17 @@
   function init() {
     injectStyles();
     createFloatingPanel();
-    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Observe with more targeted configuration
+    // Still watch subtree but with throttling and filtering
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true,
+      // Don't observe attributes or character data (reduces noise)
+      attributes: false,
+      characterData: false,
+    });
+    
     scheduleRefresh(100);
   }
 
