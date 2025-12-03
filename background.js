@@ -41,7 +41,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs?.[0];
       if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+        chrome.tabs.sendMessage(tab.id, msg, () => {
+          // Swallow errors if the content script isn't ready
+          if (chrome.runtime.lastError) {
+            return;
+          }
+        });
       }
     });
     return false;

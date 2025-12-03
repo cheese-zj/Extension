@@ -10,6 +10,19 @@
   const PANEL_STATE_KEY = "branchPanelOpen";
   const CACHE_TTL_MS = 30000; // 30 second cache TTL for conversations
   const OBSERVER_THROTTLE_MS = 500; // Throttle observer callbacks
+  const DEBUG_FLAG_KEY = "branchTreeDebug";
+
+  // Debug logging toggle (persisted in storage for dev mode)
+  let debugLoggingEnabled = false;
+  chrome.storage?.local?.get(DEBUG_FLAG_KEY, (data) => {
+    debugLoggingEnabled = Boolean(data?.[DEBUG_FLAG_KEY]);
+  });
+
+  function debugLog(...args) {
+    if (debugLoggingEnabled) {
+      console.log(...args);
+    }
+  }
 
   // ============================================
   // Conversation Cache
@@ -70,7 +83,7 @@
     if (useCache) {
       const cached = getCachedConversation(conversationId);
       if (cached) {
-        console.log("[BranchTree] Using cached conversation:", conversationId);
+        debugLog("[BranchTree] Using cached conversation:", conversationId);
         return cached;
       }
     }
@@ -125,7 +138,7 @@
         firstMessage: firstMessage || null, // Store first user message for better branch naming
         createdAt: timestampInSeconds,
       });
-      console.log("[BranchTree] Recorded branch:", {
+      debugLog("[BranchTree] Recorded branch:", {
         parentConvId,
         childConvId,
         firstMessage: firstMessage?.slice(0, 30),
@@ -353,8 +366,10 @@
     
     // Track the branchIndex that leads to current conversation (for ordering)
     let currentBranchIndex = 0;
-    // Track the colorIndex for consistent coloring
-    let currentColorIndex = hashConversationId(currentConvId);
+    // Track the colorIndex for consistent coloring (only when ancestry exists)
+    let currentColorIndex = ancestryChain.length > 0
+      ? hashConversationId(currentConvId)
+      : undefined;
     
     // Track hierarchical branch path (e.g., "1", "1.2", "1.2.1")
     let branchPath = "";
@@ -408,7 +423,7 @@
         // For levels > 0, filter out messages already shown from previous ancestors
         // This handles ChatGPT's carry-over messages when branching
         if (level > 0 && ancestorTimestamps.has(timestampSeconds)) {
-          console.log("[BranchTree] Filtering duplicate ancestor message:", text.slice(0, 30), "at level:", level);
+          debugLog("[BranchTree] Filtering duplicate ancestor message:", text.slice(0, 30), "at level:", level);
           continue;
         }
         
@@ -509,7 +524,7 @@
         // Collect post-branch items from ALL ancestors
         if (postBranchItems.length > 0) {
           allPostBranchItems.push(...postBranchItems);
-          console.log("[BranchTree] Collected post-branch items from level", level, ":", postBranchItems.length);
+          debugLog("[BranchTree] Collected post-branch items from level", level, ":", postBranchItems.length);
         }
       } else {
         result.push(...allItems);
@@ -536,7 +551,7 @@
       
       // Filter out carry-over messages that match ancestor timestamps (Issue 3)
       if (ancestorTimestamps.has(timestampSeconds)) {
-        console.log("[BranchTree] Filtering carry-over message:", text.slice(0, 30), "timestamp:", timestampSeconds);
+        debugLog("[BranchTree] Filtering carry-over message:", text.slice(0, 30), "timestamp:", timestampSeconds);
         continue;
       }
       
@@ -602,10 +617,10 @@
         isPostBranch: true, // Mark for debugging
       }));
       result.push(...mainLineItems);
-      console.log("[BranchTree] Added", mainLineItems.length, "post-branch items at the end (returned to main line)");
+      debugLog("[BranchTree] Added", mainLineItems.length, "post-branch items at the end (returned to main line)");
     }
     
-    console.log("[BranchTree] Ancestry tree built:", result.map(n => ({
+    debugLog("[BranchTree] Ancestry tree built:", result.map(n => ({
       type: n.type,
       depth: n.depth,
       expanded: n.expanded,
@@ -624,8 +639,8 @@
     const branches = branchData.branches?.[conversationId] || [];
     
     // DEBUG: Log branch data
-    console.log("[BranchTree] Building display list for:", conversationId);
-    console.log("[BranchTree] Branch data:", JSON.stringify(branches, null, 2));
+    debugLog("[BranchTree] Building display list for:", conversationId);
+    debugLog("[BranchTree] Branch data:", JSON.stringify(branches, null, 2));
     
     // Step 1: Extract all user messages with timestamps
     const userMessages = [];
@@ -656,7 +671,7 @@
     userMessages.sort((a, b) => a.createTime - b.createTime);
     
     // DEBUG: Log user messages with timestamps
-    console.log("[BranchTree] User messages:", userMessages.map(m => ({
+    debugLog("[BranchTree] User messages:", userMessages.map(m => ({
       id: m.id.slice(0, 8) + "...",
       text: m.text.slice(0, 30) + "...",
       createTime: m.createTime,
@@ -692,7 +707,7 @@
     });
     
     // DEBUG: Log branch nodes with timestamps and indices
-    console.log("[BranchTree] Branch nodes (NORMALIZED):", branchNodes.map(b => ({
+    debugLog("[BranchTree] Branch nodes (NORMALIZED):", branchNodes.map(b => ({
       id: b.id,
       text: b.text,
       colorIndex: b.colorIndex,
@@ -709,7 +724,7 @@
       (a, b) => toSeconds(a.createTime) - toSeconds(b.createTime)
     );
     
-    console.log("[BranchTree] Sorted items:", allItems.map(i => ({
+    debugLog("[BranchTree] Sorted items:", allItems.map(i => ({
       type: i.type,
       text: (i.text || "").slice(0, 20),
       time: toSeconds(i.createTime)
@@ -756,7 +771,7 @@
     }
     
     // DEBUG: Log final result
-    console.log("[BranchTree] Final display list:", result.map(n => ({
+    debugLog("[BranchTree] Final display list:", result.map(n => ({
       type: n.type,
       depth: n.depth,
       branchIndex: n.branchIndex,
@@ -824,7 +839,7 @@
           timestamp: timestampInSeconds,
         };
         chrome.storage.local.set({ pendingBranch });
-        console.log("[BranchTree] Pending branch created:", {
+      debugLog("[BranchTree] Pending branch created:", {
           parentId: convId,
           timestamp: timestampInSeconds,
           date: new Date(timestampInSeconds * 1000).toLocaleString()
@@ -863,14 +878,14 @@
     try {
       const parentConv = await fetchConversation(pending.parentId);
       parentTimestamps = getMessageTimestamps(parentConv.mapping);
-      console.log("[BranchTree] Parent timestamps for filtering:", parentTimestamps.size);
+    debugLog("[BranchTree] Parent timestamps for filtering:", parentTimestamps.size);
     } catch (err) {
-      console.log("[BranchTree] Could not fetch parent for timestamp filtering:", err);
+    debugLog("[BranchTree] Could not fetch parent for timestamp filtering:", err);
     }
 
     // Extract first user message for better branch naming (excluding carry-over messages)
     const firstMessage = extractFirstUserMessage(mapping, parentTimestamps);
-    console.log("[BranchTree] First unique message for branch:", firstMessage?.slice(0, 30));
+    debugLog("[BranchTree] First unique message for branch:", firstMessage?.slice(0, 30));
 
     // Record the branch relationship with the timestamp when branch was clicked
     // Pass existing branchData to avoid re-loading
@@ -884,7 +899,7 @@
     );
     await chrome.storage.local.remove("pendingBranch");
     
-    console.log("[BranchTree] Consumed pending branch:", pending);
+    debugLog("[BranchTree] Consumed pending branch:", pending);
     return updatedData;
   }
 
@@ -1025,7 +1040,7 @@
       let nodes;
       if (ancestryChain.length > 0) {
         // Build full ancestry tree with current conversation expanded
-        console.log("[BranchTree] Building ancestry tree with", ancestryChain.length, "ancestors");
+        debugLog("[BranchTree] Building ancestry tree with", ancestryChain.length, "ancestors");
         nodes = buildAncestryTree(ancestryChain, conv, conversationId, branchData);
       } else {
         // Root conversation - use simple display list
@@ -1067,6 +1082,12 @@
       if (typeof window.__branchTreeToggle === "function") {
         window.__branchTreeToggle();
       }
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    if (msg?.type === "CLEAR_CACHE") {
+      clearConversationCache();
       sendResponse({ ok: true });
       return false;
     }

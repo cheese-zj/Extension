@@ -932,7 +932,6 @@ function drawBackbones() {
   const nodes = Array.from(treeRoot.querySelectorAll(".tree-node"));
   if (nodes.length === 0) return;
 
-  const rootRect = treeRoot.getBoundingClientRect();
   const railSize = 20; // matches --rail-size
 
   // Group nodes by depth with their rects/colors (keep nested previews for ordering)
@@ -940,15 +939,16 @@ function drawBackbones() {
   nodes.forEach(node => {
     const type = node.dataset.type || "";
     const depth = parseInt(node.dataset.depth || "0", 10);
-    const rect = node.getBoundingClientRect();
+    const top = node.offsetTop;
+    const bottom = top + node.offsetHeight;
     const entry = nodesByDepth.get(depth) || [];
     const color =
       node.dataset.color?.trim() ||
-      getComputedStyle(node).getPropertyValue("--color")?.trim() ||
       "";
     entry.push({
       node,
-      rect,
+      top,
+      bottom,
       color,
       type,
       isBackboneNode: type !== "nested-branch",
@@ -958,14 +958,14 @@ function drawBackbones() {
 
   nodesByDepth.forEach((list, depth) => {
     // Sort by vertical position
-    list.sort((a, b) => a.rect.top - b.rect.top);
+    list.sort((a, b) => a.top - b.top);
     let lastColor = null;
     for (let i = 0; i < list.length - 1; i++) {
       const current = list[i];
       const next = list[i + 1];
       const inheritedColor = current.color || lastColor || getColor(depth);
       lastColor = inheritedColor;
-      const gap = next.rect.top - current.rect.bottom;
+      const gap = next.top - current.bottom;
 
       // Only fill meaningful gaps (skip near-adjacent nodes)
       if (gap <= 4) continue;
@@ -985,7 +985,7 @@ function drawBackbones() {
 
       backbone.style.left = `${(depth * railSize) + (railSize / 2) - 1}px`;
       // Overlap both ends to ensure connection into adjoining connectors
-      const top = current.rect.bottom - rootRect.top - 6;
+      const top = current.bottom - 6;
       const height = gap + 30;
       backbone.style.top = `${top}px`;
       backbone.style.height = `${height}px`;
@@ -1209,6 +1209,14 @@ function setupGlobalListeners() {
     if (confirm("Clear all branch tracking data? This cannot be undone.")) {
       await chrome.storage.local.remove("chatgpt_branch_data");
       await chrome.storage.local.remove("pendingBranch");
+      try {
+        const tab = await getActiveTab();
+        if (tab?.id) {
+          await chrome.tabs.sendMessage(tab.id, { type: "CLEAR_CACHE" });
+        }
+      } catch (e) {
+        // Ignore if we cannot reach the content script
+      }
       setStatus("Data cleared", "success");
       closeSettings();
       refresh();
