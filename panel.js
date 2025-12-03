@@ -970,6 +970,11 @@ function drawBackbones() {
       // Only fill meaningful gaps (skip near-adjacent nodes)
       if (gap <= 4) continue;
 
+      // Do not extend a backbone from a collapsed branch; its chain is folded
+      if (current.type === "branch" && !current.node.classList.contains("is-expanded")) {
+        continue;
+      }
+
       // Skip connecting through nested previews; they draw their own rails
       if (!current.isBackboneNode || !next.isBackboneNode) continue;
 
