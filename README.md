@@ -40,6 +40,7 @@ A browser extension that visualizes ChatGPT conversation branches as an interact
 ## How It Works
 
 The extension:
+
 1. Fetches conversation data from ChatGPT's API
 2. Builds a tree structure showing user messages and branch points
 3. Stores branch relationships locally to track conversation history
@@ -73,11 +74,15 @@ The extension:
 ## Browser Compatibility
 
 Works with all Chromium-based browsers:
+
 - Google Chrome
 - Microsoft Edge
+- Arc
+- Dia
 - Brave
 - Opera
 - Vivaldi
+- ...
 
 ## Privacy
 
