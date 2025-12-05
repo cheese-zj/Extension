@@ -973,6 +973,98 @@ function createNestedBranchElement(
   return row;
 }
 
+const NO_CONVERSATION_STEPS = [
+  'Open or start a conversation in ChatGPT.',
+  'Use "Branch in new chat" whenever you fork the thread.',
+  'Return here and press Refresh to see the branch tree.'
+];
+
+function renderGuidanceState({
+  badge = 'Waiting for a conversation',
+  title = 'Open a ChatGPT conversation to map branches',
+  description = '',
+  steps = [],
+  hint = 'After you open a chat, press Refresh to retry.'
+} = {}) {
+  nodeDataMap.clear();
+  lastRenderSignature = null;
+  treeRoot.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.className = 'empty-guidance';
+
+  if (badge) {
+    const badgeEl = document.createElement('div');
+    badgeEl.className = 'empty-guidance-badge';
+    badgeEl.textContent = badge;
+    container.appendChild(badgeEl);
+  }
+
+  if (title) {
+    const titleEl = document.createElement('div');
+    titleEl.className = 'empty-guidance-title';
+    titleEl.textContent = title;
+    container.appendChild(titleEl);
+  }
+
+  if (description) {
+    const descEl = document.createElement('div');
+    descEl.className = 'empty-guidance-desc';
+    descEl.textContent = description;
+    container.appendChild(descEl);
+  }
+
+  if (steps?.length) {
+    const list = document.createElement('ol');
+    list.className = 'empty-guidance-steps';
+    steps.forEach((step, idx) => {
+      const item = document.createElement('li');
+      const number = document.createElement('span');
+      number.className = 'empty-guidance-step-num';
+      number.textContent = `${idx + 1}`;
+      const text = document.createElement('span');
+      text.textContent = step;
+      item.appendChild(number);
+      item.appendChild(text);
+      list.appendChild(item);
+    });
+    container.appendChild(list);
+  }
+
+  if (hint) {
+    const hintEl = document.createElement('div');
+    hintEl.className = 'empty-guidance-hint';
+    hintEl.textContent = hint;
+    container.appendChild(hintEl);
+  }
+
+  treeRoot.appendChild(container);
+}
+
+function showNoConversationGuidance(description) {
+  renderGuidanceState({
+    badge: 'No conversation detected',
+    title: 'Open a ChatGPT conversation to map branches',
+    description:
+      description ||
+      'Visit chatgpt.com or chat.openai.com, open any conversation, then press Refresh.',
+    steps: NO_CONVERSATION_STEPS,
+    hint: 'Once a chat is open, hit Refresh to load the tree.'
+  });
+}
+
+function isNoConversationError(errorText = '') {
+  const lower = errorText.toLowerCase();
+  return (
+    lower.includes('conversation id') ||
+    lower.includes('no conversation') ||
+    lower.includes('receiving end does not exist') ||
+    lower.includes('establish connection') ||
+    lower.includes('cannot access contents') ||
+    lower.includes('chatgpt conversation')
+  );
+}
+
 function renderTree(nodes, title, hasAncestry = false) {
   // Skip re-render if payload is unchanged to avoid double animations
   const renderSignature = computeRenderSignature(nodes, title, hasAncestry);
@@ -1359,31 +1451,25 @@ async function fetchTree(tab = null) {
   const targetTab = tab || (await getActiveTab());
 
   if (!targetTab?.id) {
-    setStatus('No active tab');
-    return null;
+    return { error: 'No active tab' };
   }
 
   if (!isChatUrl(targetTab.url)) {
-    setStatus('Open a ChatGPT conversation');
-    return null;
+    return { error: 'Open a ChatGPT conversation' };
   }
 
   try {
-    setStatus('Loading...', 'loading');
     const response = await tabsSendMessageSafe(targetTab.id, {
       type: 'GET_CONVERSATION_TREE'
     });
 
     if (response?.error) {
-      setStatus(response.error);
-      return null;
+      return { error: response.error };
     }
 
-    setStatus('Ready', 'success');
     return response;
   } catch (err) {
-    setStatus(err?.message || 'Failed to load');
-    return null;
+    return { error: err?.message || 'Failed to load' };
   }
 }
 
@@ -1395,20 +1481,56 @@ async function refresh() {
 
   const tab = await getActiveTab();
 
-  if (!tab?.id || !isChatUrl(tab.url)) {
-    treeRoot.innerHTML = '';
-    setStatus('Open a ChatGPT conversation');
+  if (!tab?.id) {
+    currentConversationId = null;
+    showNoConversationGuidance(
+      'Open ChatGPT in a tab and select a conversation to build the tree.'
+    );
+    setStatus('Waiting for chat');
     refreshBtn.disabled = false;
     isRefreshing = false;
     return;
   }
 
+  if (!isChatUrl(tab.url)) {
+    currentConversationId = null;
+    showNoConversationGuidance(
+      'Visit chatgpt.com or chat.openai.com, open any conversation, then press Refresh.'
+    );
+    setStatus('Waiting for chat');
+    refreshBtn.disabled = false;
+    isRefreshing = false;
+    return;
+  }
+
+  setStatus('Loading...', 'loading');
   const data = await fetchTree(tab);
+
+  if (data?.error) {
+    currentConversationId = null;
+    if (isNoConversationError(data.error)) {
+      showNoConversationGuidance(
+        'Open a ChatGPT conversation tab, then refresh this panel to load its branches.'
+      );
+      setStatus('Waiting for chat');
+    } else {
+      setStatus(data.error);
+    }
+    refreshBtn.disabled = false;
+    isRefreshing = false;
+    return;
+  }
+
   if (data?.nodes) {
     currentConversationId = data.conversationId || null;
     renderTree(data.nodes, data.title, data.hasAncestry);
+    setStatus('Ready', 'success');
   } else {
     currentConversationId = null;
+    showNoConversationGuidance(
+      'Open a ChatGPT conversation to see its branch tree.'
+    );
+    setStatus('Waiting for chat');
   }
   refreshBtn.disabled = false;
   isRefreshing = false;

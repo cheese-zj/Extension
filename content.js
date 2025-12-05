@@ -1050,15 +1050,15 @@
     container.id = PANEL_ID;
     Object.assign(container.style, {
       position: 'fixed',
-      top: '56px', // Leave space for ChatGPT's top-right controls
+      top: '70px', // Leave space for ChatGPT's top-right controls
       right: '0',
       width: `var(--branch-tree-panel-width, ${PANEL_WIDTH_FALLBACK}px)`,
-      height: 'calc(100vh - 55px)', // Shorter panel with top and bottom margin
+      height: 'calc(100vh - 70px)', // Shorter panel with top and bottom margin
       zIndex: '2147483646',
       pointerEvents: 'none',
       transition:
         'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease',
-      padding: '10px',
+      padding: '0px',
       boxSizing: 'border-box',
       transform: `translateX(calc(100% + ${PANEL_GAP}px))`,
       opacity: '0'
@@ -1070,11 +1070,11 @@
     Object.assign(frame.style, {
       width: '100%',
       height: '100%',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
+      border: '1px 1px 0 0 solid rgba(255, 255, 255, 0.08)',
       pointerEvents: 'auto',
-      borderRadius: '20px',
+      borderRadius: '20px 0 0 0',
       boxShadow:
-        '0 8px 32px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        '0 8px 32px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05)',
       background: 'transparent'
     });
 
