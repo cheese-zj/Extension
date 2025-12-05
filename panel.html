@@ -1,32 +1,61 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Branch Tree</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Branch Tree</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    :root {
-      --bg: #141414;
-      --surface: #1a1a1a;
-      --surface-2: #222222;
-      --border: #3a3a3a;
-      --text: #e8e8e8;
-      --text-muted: #888888;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.3);
-      --branch: #10b981;
-      --branch-glow: rgba(16, 185, 129, 0.3);
-      --rail-size: 20px;
-    }
-
-    @media (prefers-color-scheme: light) {
       :root {
+        --bg: #141414;
+        --surface: #1a1a1a;
+        --surface-2: #222222;
+        --border: #3a3a3a;
+        --text: #e8e8e8;
+        --text-muted: #888888;
+        --accent: #6366f1;
+        --accent-glow: rgba(99, 102, 241, 0.3);
+        --branch: #10b981;
+        --branch-glow: rgba(16, 185, 129, 0.3);
+        --rail-size: 20px;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f5f5f5;
+          --surface: #ffffff;
+          --surface-2: #ebebeb;
+          --border: #d0d0d0;
+          --text: #1a1a1a;
+          --text-muted: #666666;
+          --accent: #4f46e5;
+          --accent-glow: rgba(79, 70, 229, 0.2);
+          --branch: #059669;
+          --branch-glow: rgba(5, 150, 105, 0.2);
+        }
+      }
+
+      /* Theme Override - Force Dark */
+      body.theme-dark {
+        --bg: #141414;
+        --surface: #1a1a1a;
+        --surface-2: #222222;
+        --border: #3a3a3a;
+        --text: #e8e8e8;
+        --text-muted: #888888;
+        --accent: #6366f1;
+        --accent-glow: rgba(99, 102, 241, 0.3);
+        --branch: #10b981;
+        --branch-glow: rgba(16, 185, 129, 0.3);
+      }
+
+      /* Theme Override - Force Light */
+      body.theme-light {
         --bg: #f5f5f5;
         --surface: #ffffff;
         --surface-2: #ebebeb;
@@ -38,1408 +67,1537 @@
         --branch: #059669;
         --branch-glow: rgba(5, 150, 105, 0.2);
       }
-    }
 
-    /* Theme Override - Force Dark */
-    body.theme-dark {
-      --bg: #141414;
-      --surface: #1a1a1a;
-      --surface-2: #222222;
-      --border: #3a3a3a;
-      --text: #e8e8e8;
-      --text-muted: #888888;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.3);
-      --branch: #10b981;
-      --branch-glow: rgba(16, 185, 129, 0.3);
-    }
-
-    /* Theme Override - Force Light */
-    body.theme-light {
-      --bg: #f5f5f5;
-      --surface: #ffffff;
-      --surface-2: #ebebeb;
-      --border: #d0d0d0;
-      --text: #1a1a1a;
-      --text-muted: #666666;
-      --accent: #4f46e5;
-      --accent-glow: rgba(79, 70, 229, 0.2);
-      --branch: #059669;
-      --branch-glow: rgba(5, 150, 105, 0.2);
-    }
-
-    /* Compact Mode */
-    body.compact-mode .tree-node {
-      padding: 1px 0;
-    }
-
-    body.compact-mode .tree-card {
-      padding: 5px 8px;
-    }
-
-    body.compact-mode .card-preview {
-      font-size: 11px;
-    }
-
-    body.compact-mode .card-label {
-      font-size: 8px;
-      padding: 1px 4px;
-    }
-
-    body.compact-mode .card-time {
-      font-size: 9px;
-    }
-
-    body.compact-mode .card-title-text {
-      font-size: 12px;
-    }
-
-    body.compact-mode .rail-dot {
-      width: 5px;
-      height: 5px;
-    }
-
-    body.compact-mode .tree-node.is-title .rail-dot {
-      width: 7px;
-      height: 7px;
-    }
-
-    body {
-      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 16px;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    /* Header */
-    #header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    #status-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      justify-content: flex-start;
-    }
-
-    #status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--text-muted);
-      transition: background 0.2s ease;
-    }
-
-    #status-dot.loading {
-      background: var(--accent);
-      animation: pulse 1.2s ease-in-out infinite;
-    }
-
-    #status-dot.success {
-      background: var(--branch);
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
-    }
-
-    #status {
-      font-size: 11px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Tree Container */
-    #tree-root {
-      position: relative;
-      max-height: calc(100vh - 80px);
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
-    #tree-root::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    #tree-root::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    #tree-root::-webkit-scrollbar-thumb {
-      background: transparent;
-      border-radius: 2px;
-      transition: background 0.2s ease;
-    }
-
-    #tree-root:hover::-webkit-scrollbar-thumb {
-      background: var(--border);
-    }
-
-    /* Colored backbone per depth column */
-    .tree-backbone {
-      position: absolute;
-      width: 2px;
-      border-radius: 0;
-      opacity: 0.6;
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    /* Tree Node Animation */
-    @keyframes nodeEnter {
-      from {
-        opacity: 0;
-        transform: translateY(4px);
+      /* Compact Mode */
+      body.compact-mode .tree-node {
+        padding: 1px 0;
       }
-      to {
+
+      body.compact-mode .tree-card {
+        padding: 5px 8px;
+      }
+
+      body.compact-mode .card-preview {
+        font-size: 11px;
+      }
+
+      body.compact-mode .card-label {
+        font-size: 8px;
+        padding: 1px 4px;
+      }
+
+      body.compact-mode .card-time {
+        font-size: 9px;
+      }
+
+      body.compact-mode .card-title-text {
+        font-size: 12px;
+      }
+
+      body.compact-mode .rail-dot {
+        width: 5px;
+        height: 5px;
+      }
+
+      body.compact-mode .tree-node.is-title .rail-dot {
+        width: 7px;
+        height: 7px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          'SF Pro Text',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        margin: 0;
+        padding: 14px;
+        font-size: 13px;
+        line-height: 1.5;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* Footer bar - Modern glass-like design, positioned at bottom */
+      #header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: auto;
+        padding: 10px 12px;
+        background: var(--surface);
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      #status-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: flex-start;
+      }
+
+      #status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        transition: background 0.2s ease;
+      }
+
+      #status-dot.loading {
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      #status-dot.success {
+        background: var(--branch);
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(0.85);
+        }
+      }
+
+      #status {
+        font-size: 11px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Tree Container */
+      #tree-root {
+        position: relative;
+        flex: 1;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      #tree-root::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      #tree-root::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      #tree-root::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 2px;
+        transition: background 0.2s ease;
+      }
+
+      #tree-root:hover::-webkit-scrollbar-thumb {
+        background: var(--border);
+      }
+
+      /* Colored backbone per depth column */
+      .tree-backbone {
+        position: absolute;
+        width: 2px;
+        border-radius: 0;
+        opacity: 0.6;
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      /* Tree Node Animation */
+      @keyframes nodeEnter {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Empty State */
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .empty-state-icon {
+        width: 32px;
+        height: 32px;
+        opacity: 0.4;
+      }
+
+      .empty-state-text {
+        font-size: 12px;
+      }
+
+      /* Tree Node */
+      .tree-node {
+        display: flex;
+        gap: 8px;
+        padding: 2px 0;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        border-radius: 6px;
+        margin: 0;
+        animation: nodeEnter 0.2s ease forwards;
+        opacity: 0;
+      }
+
+      .tree-node:hover {
+        background: color-mix(in srgb, var(--accent) 6%, transparent);
+      }
+
+      .tree-node:hover .tree-card {
+        border-color: var(--color, var(--accent));
+      }
+
+      .tree-node.is-branch:hover .tree-card {
+        border-color: var(--color, var(--branch));
+      }
+
+      /* Rail (visual connector) */
+      .rail {
+        display: flex;
+        align-items: stretch;
+        padding: 0;
+        min-width: var(--rail-size);
+        flex-shrink: 0;
+      }
+
+      .rail-line {
+        width: var(--rail-size);
+        position: relative;
+      }
+
+      .rail-line::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: -2px;
+        bottom: -2px;
+        width: 2px;
+        background: var(--line-color, var(--border));
+        transform: translateX(-50%);
+        opacity: 0.5;
+        border-radius: 0;
+      }
+
+      .rail-connector {
+        width: var(--rail-size);
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Regular node connectors - straight vertical lines */
+      .rail-connector.has-above::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: -2px;
+        height: calc(50% + 2px);
+        width: 2px;
+        background: var(--color, var(--accent));
+        transform: translateX(-50%);
+        border-radius: 0;
+      }
+
+      .rail-connector.has-below::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -2px;
+        height: calc(50% + 2px);
+        width: 2px;
+        background: var(--color, var(--accent));
+        transform: translateX(-50%);
+        border-radius: 0;
+      }
+
+      /* Ensure regular connectors don't inherit branch styling */
+      .rail-connector.has-above:not(.branch-connector)::before,
+      .rail-connector.has-below:not(.branch-connector)::after {
+        border: none;
+        border-radius: 0;
+      }
+
+      /* Branch connector - curved L-junction from main line */
+      .rail-connector.branch-connector {
+        position: relative;
+      }
+
+      /* Curved L-corner: vertical segment going up to backbone */
+      .rail-connector.branch-connector::before {
+        content: '';
+        position: absolute;
+        left: calc(-0.5 * var(--rail-size) - 1px);
+        bottom: 49%;
+        width: calc(0.5 * var(--rail-size) + 2px);
+        height: 94%;
+        background: transparent;
+        border-left: 2px solid var(--color, var(--branch));
+        border-bottom: 2px solid var(--color, var(--branch));
+        border-radius: 0 0 0 16px;
+        box-sizing: border-box;
+      }
+
+      /* Horizontal arm from L-corner to dot */
+      .rail-connector.branch-connector::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 6px;
+        height: 2px;
+        background: var(--color, var(--branch));
+        transform: translateY(-50%);
+        border-radius: 0;
+        z-index: 0;
+      }
+
+      .rail-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--color, var(--accent));
+        border: none;
+        position: relative;
+        z-index: 1;
+        transition: transform 0.12s ease;
+        overflow: visible;
+      }
+
+      .tree-node:hover .rail-dot {
+        transform: scale(1.3);
+      }
+
+      /* Branch junction dots - larger and with ring style */
+      .rail-dot.branch-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--bg);
+        border: 2px solid var(--branch-color, var(--branch));
+        box-sizing: border-box;
+      }
+
+      .tree-node:hover .rail-dot.branch-dot {
+        background: var(--branch-color, var(--branch));
+        z-index: 100;
+      }
+
+      .rail-dot.branch-root-dot {
+        background: var(--branch);
+      }
+
+      /* Branch card border matches branch color */
+      .tree-node.is-branch .tree-card {
+        border-left: 2px solid var(--color, var(--branch));
+        border-radius: 5px;
+      }
+
+      /* Title node styles - gradient background for visual distinction */
+      .tree-node.is-title .rail-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+      }
+
+      .tree-node.is-title .tree-card {
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--accent) 6%, var(--surface)) 0%,
+          color-mix(in srgb, var(--accent) 3%, var(--surface)) 100%
+        );
+        border-color: var(--accent);
+        border-left-width: 3px;
+      }
+
+      /* Ancestor title styling - subtle gradient, more muted */
+      .tree-node.is-ancestor-title .tree-card {
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--text-muted) 8%, var(--surface)) 0%,
+          var(--surface) 100%
+        );
+        border-color: var(--border);
+        opacity: 0.9;
+      }
+
+      .tree-node.is-ancestor-title .rail-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--text-muted);
+      }
+
+      .card-ancestor-label {
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        opacity: 0.7;
+        margin-bottom: 2px;
+      }
+
+      /* Current title styling - highlighted with stronger gradient */
+      .tree-node.is-current-title .tree-card {
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--accent) 15%, var(--surface)) 0%,
+          color-mix(in srgb, var(--accent) 5%, var(--surface)) 100%
+        );
+        border-color: var(--accent);
+        border-width: 2px;
+        border-left-width: 3px;
+      }
+
+      .tree-node.is-current-title .rail-dot {
+        width: 10px;
+        height: 10px;
+        background: var(--accent);
+      }
+
+      /* Main conversation being viewed (no ancestry) */
+      .tree-node.is-main-viewing .tree-card {
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--accent) 14%, var(--surface)) 0%,
+          color-mix(in srgb, var(--accent) 6%, var(--surface)) 100%
+        );
+        border-color: var(--accent);
+        box-shadow: 0 6px 18px
+          color-mix(in srgb, var(--accent) 18%, transparent);
+      }
+
+      .card-current-label {
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--accent);
+        margin-bottom: 2px;
+      }
+
+      .card-main-label {
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--accent);
+        margin-bottom: 2px;
+        font-weight: 600;
+      }
+
+      .card-title-text {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.3;
+      }
+
+      /* Expanded branch - shows it leads to child content */
+      .tree-node.is-expanded .tree-card {
+        background: var(--surface);
+        border-color: var(--color, var(--branch));
+      }
+
+      .tree-node.is-expanded .rail-dot.expanded-dot {
+        width: 8px;
+        height: 8px;
+      }
+
+      .tree-node.is-current-path .tree-card {
+        border-left-width: 3px;
+      }
+
+      /* Vertical line going down from expanded branch into its children - COLORED */
+      .rail-connector.branch-connector.branch-expanded .rail-dot::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        width: 2px;
+        height: 28px;
+        background: var(--branch-color, var(--branch));
+        transform: translateX(-50%);
+        border-radius: 0;
+      }
+
+      /* Collapsed branch with nested branches: show line going down to nested previews */
+      /* This line extends from the parent branch dot down to connect with the first nested branch */
+      .tree-node.is-branch.has-nested
+        .rail-connector.branch-connector
+        .rail-dot::after {
+        content: '' !important;
+        display: block !important;
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        width: 2px;
+        height: 20px;
+        background: var(--branch-color, var(--branch));
+        transform: translateX(-50%);
+        border-radius: 0;
+      }
+
+      /* Terminal nodes (end of their chain) should not have any outgoing edges below */
+      /* For regular nodes, hide the has-below line */
+      .tree-node.is-terminal:not(.is-branch) .rail-connector.has-below::after {
+        display: none !important;
+      }
+
+      /* But expanded branches should still show line down to their children */
+      /* Ensure expanded branches show their line down to children */
+      .tree-node.is-expanded .rail-connector.branch-expanded .rail-dot::after {
+        display: block !important;
+      }
+
+      /* Current conversation nodes get subtle highlight */
+      .tree-node.is-current .tree-card {
+        background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+      }
+
+      /* Last node in the entire list should not have any outgoing connector */
+      .tree-node.is-last-node:not(.is-branch) .rail-connector.has-below::after {
+        display: none;
+      }
+
+      /* Label for expanded branches */
+      .card-label.label-expanded {
+        background: var(--color, var(--branch));
+        color: white;
+        font-weight: 800;
+      }
+
+      /* Label for viewing branch (the one currently being displayed) */
+      .card-label.label-viewing {
+        background: var(--color, var(--branch));
+        color: white;
+        font-weight: 800;
+      }
+
+      .card-label.title-viewing-tag {
+        margin-left: 0;
+      }
+
+      .card-label.label-main-viewing {
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      .main-title-header {
+        margin-bottom: 6px;
+        gap: 8px;
+      }
+
+      .tree-node.is-branch.is-viewing .tree-card {
+        background: linear-gradient(
+          135deg,
+          color-mix(
+              in srgb,
+              var(--branch-color, var(--branch)) 16%,
+              var(--surface)
+            )
+            0%,
+          color-mix(
+              in srgb,
+              var(--branch-color, var(--branch)) 6%,
+              var(--surface)
+            )
+            100%
+        );
+        border-color: var(--branch-color, var(--branch));
+        box-shadow: 0 4px 18px
+          color-mix(
+            in srgb,
+            var(--branch-color, var(--branch)) 18%,
+            transparent
+          );
+      }
+
+      .tree-node.is-branch.is-viewing .rail-dot {
+        background: var(--branch-color, var(--branch));
+        box-shadow: 0 0 0 4px
+          color-mix(
+            in srgb,
+            var(--branch-color, var(--branch)) 22%,
+            transparent
+          );
+      }
+
+      /* Card */
+      .tree-card {
+        flex: 1;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        min-width: 0;
+        transition: border-color 0.15s ease;
+      }
+
+      .tree-card.message-card {
+        padding: 6px 8px;
+        border-radius: 5px;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 2px;
+      }
+
+      .card-header.message-header {
+        gap: 4px;
+        margin-bottom: 1px;
+        color: var(--text-muted);
+      }
+
+      .card-label {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: var(--surface-2);
+        color: var(--text-muted);
+      }
+
+      .card-label.label-user {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--accent);
+      }
+
+      .card-label.label-branch {
+        background: color-mix(
+          in srgb,
+          var(--color, var(--branch)) 15%,
+          transparent
+        );
+        color: var(--color, var(--branch));
+      }
+
+      .card-label.label-branch-root {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--branch);
+      }
+
+      .card-time {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-left: auto;
+        opacity: 0.7;
+      }
+
+      .card-time.card-time-compact {
+        margin-left: 0;
+        font-size: 10px;
+        letter-spacing: 0;
+        opacity: 0.8;
+      }
+
+      .card-preview {
+        font-size: 12px;
+        color: var(--text);
+        line-height: 1.35;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .card-preview.message-preview {
+        line-height: 1.25;
+      }
+
+      .branch-path-line {
+        margin-top: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color, var(--branch));
+        letter-spacing: -0.01em;
+      }
+
+      /* Hide preview margin when no preview */
+      .card-header:last-child {
+        margin-bottom: 0;
+      }
+
+      /* Tooltip */
+      .tooltip {
+        position: absolute;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--text);
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition:
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        max-height: 200px;
+        overflow-y: auto;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+
+      .tooltip.visible {
         opacity: 1;
         transform: translateY(0);
       }
-    }
 
-    /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-muted);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
+      .tooltip.tooltip-branch {
+        border-color: var(--branch);
+      }
 
-    .empty-state-icon {
-      width: 32px;
-      height: 32px;
-      opacity: 0.4;
-    }
+      /* Depth-based indentation */
+      .tree-node[data-depth='1'] .tree-card {
+        margin-left: 0;
+      }
 
-    .empty-state-text {
-      font-size: 12px;
-    }
+      .tree-node[data-depth='2'] .tree-card {
+        opacity: 0.9;
+      }
 
-    /* Tree Node */
-    .tree-node {
-      display: flex;
-      gap: 8px;
-      padding: 2px 0;
-      cursor: pointer;
-      transition: background 0.15s ease;
-      border-radius: 6px;
-      margin: 0;
-      animation: nodeEnter 0.2s ease forwards;
-      opacity: 0;
-    }
+      .tree-node[data-depth='3'] .tree-card {
+        opacity: 0.85;
+      }
 
-    .tree-node:hover {
-      background: color-mix(in srgb, var(--accent) 6%, transparent);
-    }
-
-    .tree-node:hover .tree-card {
-      border-color: var(--color, var(--accent));
-    }
-
-    .tree-node.is-branch:hover .tree-card {
-      border-color: var(--color, var(--branch));
-    }
-
-    /* Rail (visual connector) */
-    .rail {
-      display: flex;
-      align-items: stretch;
-      padding: 0;
-      min-width: var(--rail-size);
-      flex-shrink: 0;
-    }
-
-    .rail-line {
-      width: var(--rail-size);
-      position: relative;
-    }
-
-    .rail-line::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: -2px;
-      bottom: -2px;
-      width: 2px;
-      background: var(--line-color, var(--border));
-      transform: translateX(-50%);
-      opacity: 0.5;
-      border-radius: 0;
-    }
-
-    .rail-connector {
-      width: var(--rail-size);
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Regular node connectors - straight vertical lines */
-    .rail-connector.has-above::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: -2px;
-      height: calc(50% + 2px);
-      width: 2px;
-      background: var(--color, var(--accent));
-      transform: translateX(-50%);
-      border-radius: 0;
-    }
-
-    .rail-connector.has-below::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      bottom: -2px;
-      height: calc(50% + 2px);
-      width: 2px;
-      background: var(--color, var(--accent));
-      transform: translateX(-50%);
-      border-radius: 0;
-    }
-
-    /* Ensure regular connectors don't inherit branch styling */
-    .rail-connector.has-above:not(.branch-connector)::before,
-    .rail-connector.has-below:not(.branch-connector)::after {
-      border: none;
-      border-radius: 0;
-    }
-
-    /* Branch connector - curved L-junction from main line */
-    .rail-connector.branch-connector {
-      position: relative;
-    }
-
-    /* Curved L-corner: vertical segment going up to backbone */
-    .rail-connector.branch-connector::before {
-      content: "";
-      position: absolute;
-      left: calc(-0.5 * var(--rail-size) - 1px);
-      bottom: 49%;
-      width: calc(0.5 * var(--rail-size) + 2px);
-      height: 94%;
-      background: transparent;
-      border-left: 2px solid var(--color, var(--branch));
-      border-bottom: 2px solid var(--color, var(--branch));
-      border-radius: 0 0 0 16px;
-      box-sizing: border-box;
-    }
-
-    /* Horizontal arm from L-corner to dot */
-    .rail-connector.branch-connector::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 50%;
-      width: 6px;
-      height: 2px;
-      background: var(--color, var(--branch));
-      transform: translateY(-50%);
-      border-radius: 0;
-      z-index: 0;
-    }
-
-    .rail-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--color, var(--accent));
-      border: none;
-      position: relative;
-      z-index: 1;
-      transition: transform 0.12s ease;
-      overflow: visible;
-    }
-
-    .tree-node:hover .rail-dot {
-      transform: scale(1.3);
-    }
-
-    /* Branch junction dots - larger and with ring style */
-    .rail-dot.branch-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--bg);
-      border: 2px solid var(--branch-color, var(--branch));
-      box-sizing: border-box;
-    }
-
-    .tree-node:hover .rail-dot.branch-dot {
-      background: var(--branch-color, var(--branch));
-      z-index: 100;
-    }
-
-    .rail-dot.branch-root-dot {
-      background: var(--branch);
-    }
-
-    /* Branch card border matches branch color */
-    .tree-node.is-branch .tree-card {
-      border-left: 2px solid var(--color, var(--branch));
-      border-radius: 5px;
-    }
-
-    /* Title node styles - gradient background for visual distinction */
-    .tree-node.is-title .rail-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--accent);
-    }
-
-    .tree-node.is-title .tree-card {
-      background: linear-gradient(135deg, 
-        color-mix(in srgb, var(--accent) 6%, var(--surface)) 0%,
-        color-mix(in srgb, var(--accent) 3%, var(--surface)) 100%);
-      border-color: var(--accent);
-      border-left-width: 3px;
-    }
-
-    /* Ancestor title styling - subtle gradient, more muted */
-    .tree-node.is-ancestor-title .tree-card {
-      background: linear-gradient(135deg,
-        color-mix(in srgb, var(--text-muted) 8%, var(--surface)) 0%,
-        var(--surface) 100%);
-      border-color: var(--border);
-      opacity: 0.9;
-    }
-
-    .tree-node.is-ancestor-title .rail-dot {
-      width: 6px;
-      height: 6px;
-      background: var(--text-muted);
-    }
-
-    .card-ancestor-label {
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      opacity: 0.7;
-      margin-bottom: 2px;
-    }
-
-    /* Current title styling - highlighted with stronger gradient */
-    .tree-node.is-current-title .tree-card {
-      background: linear-gradient(135deg,
-        color-mix(in srgb, var(--accent) 15%, var(--surface)) 0%,
-        color-mix(in srgb, var(--accent) 5%, var(--surface)) 100%);
-      border-color: var(--accent);
-      border-width: 2px;
-      border-left-width: 3px;
-    }
-
-    .tree-node.is-current-title .rail-dot {
-      width: 10px;
-      height: 10px;
-      background: var(--accent);
-    }
-
-    /* Main conversation being viewed (no ancestry) */
-    .tree-node.is-main-viewing .tree-card {
-      background: linear-gradient(135deg,
-        color-mix(in srgb, var(--accent) 14%, var(--surface)) 0%,
-        color-mix(in srgb, var(--accent) 6%, var(--surface)) 100%);
-      border-color: var(--accent);
-      box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent);
-    }
-
-    .card-current-label {
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-      margin-bottom: 2px;
-    }
-
-    .card-main-label {
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-      margin-bottom: 2px;
-      font-weight: 600;
-    }
-
-    .card-title-text {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      line-height: 1.3;
-    }
-
-    /* Expanded branch - shows it leads to child content */
-    .tree-node.is-expanded .tree-card {
-      background: var(--surface);
-      border-color: var(--color, var(--branch));
-    }
-
-    .tree-node.is-expanded .rail-dot.expanded-dot {
-      width: 8px;
-      height: 8px;
-    }
-
-    .tree-node.is-current-path .tree-card {
-      border-left-width: 3px;
-    }
-
-    /* Vertical line going down from expanded branch into its children - COLORED */
-    .rail-connector.branch-connector.branch-expanded .rail-dot::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 100%;
-      width: 2px;
-      height: 28px;
-      background: var(--branch-color, var(--branch));
-      transform: translateX(-50%);
-      border-radius: 0;
-    }
-
-    /* Collapsed branch with nested branches: show line going down to nested previews */
-    /* This line extends from the parent branch dot down to connect with the first nested branch */
-    .tree-node.is-branch.has-nested .rail-connector.branch-connector .rail-dot::after {
-      content: "" !important;
-      display: block !important;
-      position: absolute;
-      left: 50%;
-      top: 100%;
-      width: 2px;
-      height: 20px;
-      background: var(--branch-color, var(--branch));
-      transform: translateX(-50%);
-      border-radius: 0;
-    }
-
-    /* Terminal nodes (end of their chain) should not have any outgoing edges below */
-    /* For regular nodes, hide the has-below line */
-    .tree-node.is-terminal:not(.is-branch) .rail-connector.has-below::after {
-      display: none !important;
-    }
-
-    /* But expanded branches should still show line down to their children */
-    /* Ensure expanded branches show their line down to children */
-    .tree-node.is-expanded .rail-connector.branch-expanded .rail-dot::after {
-      display: block !important;
-    }
-
-    /* Current conversation nodes get subtle highlight */
-    .tree-node.is-current .tree-card {
-      background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-    }
-
-    /* Last node in the entire list should not have any outgoing connector */
-    .tree-node.is-last-node:not(.is-branch) .rail-connector.has-below::after {
-      display: none;
-    }
-
-    /* Label for expanded branches */
-    .card-label.label-expanded {
-      background: var(--color, var(--branch));
-      color: white;
-      font-weight: 800;
-    }
-
-    /* Label for viewing branch (the one currently being displayed) */
-    .card-label.label-viewing {
-      background: var(--color, var(--branch));
-      color: white;
-      font-weight: 800;
-    }
-
-    .card-label.title-viewing-tag {
-      margin-left: 0;
-    }
-
-    .card-label.label-main-viewing {
-      background: color-mix(in srgb, var(--accent) 18%, transparent);
-      color: var(--accent);
-      font-weight: 800;
-    }
-
-    .main-title-header {
-      margin-bottom: 6px;
-      gap: 8px;
-    }
-
-    .tree-node.is-branch.is-viewing .tree-card {
-      background: linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--branch-color, var(--branch)) 16%, var(--surface)) 0%,
-        color-mix(in srgb, var(--branch-color, var(--branch)) 6%, var(--surface)) 100%
-      );
-      border-color: var(--branch-color, var(--branch));
-      box-shadow: 0 4px 18px color-mix(in srgb, var(--branch-color, var(--branch)) 18%, transparent);
-    }
-
-    .tree-node.is-branch.is-viewing .rail-dot {
-      background: var(--branch-color, var(--branch));
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--branch-color, var(--branch)) 22%, transparent);
-    }
-
-    /* Card */
-    .tree-card {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 10px;
-      min-width: 0;
-      transition: border-color 0.15s ease;
-    }
-
-    .tree-card.message-card {
-      padding: 6px 8px;
-      border-radius: 5px;
-    }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 2px;
-    }
-
-    .card-header.message-header {
-      gap: 4px;
-      margin-bottom: 1px;
-      color: var(--text-muted);
-    }
-
-    .card-label {
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: var(--surface-2);
-      color: var(--text-muted);
-    }
-
-    .card-label.label-user {
-      background: rgba(99, 102, 241, 0.15);
-      color: var(--accent);
-    }
-
-    .card-label.label-branch {
-      background: color-mix(in srgb, var(--color, var(--branch)) 15%, transparent);
-      color: var(--color, var(--branch));
-    }
-
-    .card-label.label-branch-root {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--branch);
-    }
-
-    .card-time {
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-left: auto;
-      opacity: 0.7;
-    }
-
-    .card-time.card-time-compact {
-      margin-left: 0;
-      font-size: 10px;
-      letter-spacing: 0;
-      opacity: 0.8;
-    }
-
-    .card-preview {
-      font-size: 12px;
-      color: var(--text);
-      line-height: 1.35;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .card-preview.message-preview {
-      line-height: 1.25;
-    }
-
-    .branch-path-line {
-      margin-top: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--color, var(--branch));
-      letter-spacing: -0.01em;
-    }
-
-    /* Hide preview margin when no preview */
-    .card-header:last-child {
-      margin-bottom: 0;
-    }
-
-    /* Tooltip */
-    .tooltip {
-      position: absolute;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 12px;
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text);
-      z-index: 1000;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(-4px);
-      transition: opacity 0.15s ease, transform 0.15s ease;
-      max-height: 200px;
-      overflow-y: auto;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-
-    .tooltip.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .tooltip.tooltip-branch {
-      border-color: var(--branch);
-    }
-
-    /* Depth-based indentation */
-    .tree-node[data-depth="1"] .tree-card {
-      margin-left: 0;
-    }
-
-    .tree-node[data-depth="2"] .tree-card {
-      opacity: 0.9;
-    }
-
-    .tree-node[data-depth="3"] .tree-card {
-      opacity: 0.85;
-    }
-
-    /* ================================
+      /* ================================
        Nested Branch Preview Styles
        ================================ */
-    
-    /* Nested branch node container */
-    .nested-branch-node {
-      padding: 1px 0;
-    }
 
-    .nested-branch-node:hover {
-      background: rgba(99, 102, 241, 0.05);
-    }
+      /* Nested branch node container */
+      .nested-branch-node {
+        padding: 1px 0;
+      }
 
-    /* Compact rail for nested branches */
-    .nested-rail {
-      min-width: var(--rail-size);
-    }
+      .nested-branch-node:hover {
+        background: rgba(99, 102, 241, 0.05);
+      }
 
-    /* Rail lines for nested branches */
-    .nested-rail-line::before {
-      opacity: 0.6;
-      background: var(--line-color, var(--border));
-    }
+      /* Compact rail for nested branches */
+      .nested-rail {
+        min-width: var(--rail-size);
+      }
 
-    /* Show parent's main line through nested content when continuation exists */
-    .nested-rail-line.main-line::before {
-      display: block;
-      background: var(--parent-color, var(--branch));
-      opacity: 0.9;
-    }
+      /* Rail lines for nested branches */
+      .nested-rail-line::before {
+        opacity: 0.6;
+        background: var(--line-color, var(--border));
+      }
 
-    /* Main line rail in nested branches */
-    .nested-rail-line.main-line::before {
-      opacity: 0.6;
-    }
+      /* Show parent's main line through nested content when continuation exists */
+      .nested-rail-line.main-line::before {
+        display: block;
+        background: var(--parent-color, var(--branch));
+        opacity: 0.9;
+      }
 
-    /* Nested connector - uses dotted line style with PARENT color for lines */
-    .nested-connector {
-      position: relative;
-    }
+      /* Main line rail in nested branches */
+      .nested-rail-line.main-line::before {
+        opacity: 0.6;
+      }
 
-    /* Curved L-corner for nested branches */
-    .nested-connector::before {
-      content: "";
-      position: absolute;
-      left: calc(-0.5 * var(--rail-size));
-      bottom: 50%;
-      width: calc(0.5 * var(--rail-size) + 1px);
-      height: 10px;
-      background: transparent;
-      border-left: 2px solid var(--branch-color, var(--branch));
-      border-bottom: 2px solid var(--branch-color, var(--branch));
-      border-radius: 0;
-      box-sizing: border-box;
-    }
+      /* Nested connector - uses dotted line style with PARENT color for lines */
+      .nested-connector {
+        position: relative;
+      }
 
-    /* First nested branch extends line further up to connect with parent */
-    .nested-branch-node.is-first-nested .nested-connector::before {
-      height: 18px;
-    }
+      /* Curved L-corner for nested branches */
+      .nested-connector::before {
+        content: '';
+        position: absolute;
+        left: calc(-0.5 * var(--rail-size));
+        bottom: 50%;
+        width: calc(0.5 * var(--rail-size) + 1px);
+        height: 10px;
+        background: transparent;
+        border-left: 2px solid var(--branch-color, var(--branch));
+        border-bottom: 2px solid var(--branch-color, var(--branch));
+        border-radius: 0;
+        box-sizing: border-box;
+      }
 
-    /* Horizontal arm from L-corner to dot */
-    .nested-connector::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 50%;
-      width: 4px;
-      height: 2px;
-      background: var(--branch-color, var(--branch));
-      transform: translateY(-50%);
-      border-radius: 0;
-    }
+      /* First nested branch extends line further up to connect with parent */
+      .nested-branch-node.is-first-nested .nested-connector::before {
+        height: 18px;
+      }
 
-    /* Small dot for nested branches - ring style */
-    .nested-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--bg);
-      border: 1.5px solid var(--branch-color, var(--branch));
-      box-sizing: border-box;
-      opacity: 0.8;
-    }
+      /* Horizontal arm from L-corner to dot */
+      .nested-connector::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 4px;
+        height: 2px;
+        background: var(--branch-color, var(--branch));
+        transform: translateY(-50%);
+        border-radius: 0;
+      }
 
-    .nested-branch-node:hover .nested-dot {
-      transform: scale(1.2);
-      opacity: 1;
-      background: var(--branch-color, var(--branch));
-    }
+      /* Small dot for nested branches - ring style */
+      .nested-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--bg);
+        border: 1.5px solid var(--branch-color, var(--branch));
+        box-sizing: border-box;
+        opacity: 0.8;
+      }
 
-    /* Compact card for nested branches - uses BRANCH'S OWN color for border */
-    .nested-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 2px solid var(--branch-color, var(--branch));
-      border-radius: 6px;
-      padding: 4px 8px;
-      opacity: 0.8;
-      transition: opacity 0.15s ease, border-color 0.15s ease;
-    }
+      .nested-branch-node:hover .nested-dot {
+        transform: scale(1.2);
+        opacity: 1;
+        background: var(--branch-color, var(--branch));
+      }
 
-    .nested-branch-node:hover .nested-card {
-      opacity: 1;
-      border-color: var(--branch-color, var(--branch));
-    }
+      /* Compact card for nested branches - uses BRANCH'S OWN color for border */
+      .nested-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 2px solid var(--branch-color, var(--branch));
+        border-radius: 6px;
+        padding: 4px 8px;
+        opacity: 0.8;
+        transition:
+          opacity 0.15s ease,
+          border-color 0.15s ease;
+      }
 
-    /* Compact label for nested branches - uses BRANCH'S OWN color */
-    .nested-label {
-      font-size: 8px;
-      padding: 1px 4px;
-      background: color-mix(in srgb, var(--branch-color, var(--branch)) 15%, transparent);
-      color: var(--branch-color, var(--branch));
-    }
+      .nested-branch-node:hover .nested-card {
+        opacity: 1;
+        border-color: var(--branch-color, var(--branch));
+      }
 
-    /* Compact preview text for nested branches */
-    .nested-preview {
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.3;
-      margin-top: 2px;
-    }
+      /* Compact label for nested branches - uses BRANCH'S OWN color */
+      .nested-label {
+        font-size: 8px;
+        padding: 1px 4px;
+        background: color-mix(
+          in srgb,
+          var(--branch-color, var(--branch)) 15%,
+          transparent
+        );
+        color: var(--branch-color, var(--branch));
+      }
 
-    .nested-branch-node:hover .nested-preview {
-      color: var(--text);
-    }
+      /* Compact preview text for nested branches */
+      .nested-preview {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.3;
+        margin-top: 2px;
+      }
 
-    /* Header in nested cards */
-    .nested-card .card-header {
-      margin-bottom: 0;
-    }
+      .nested-branch-node:hover .nested-preview {
+        color: var(--text);
+      }
 
-    .nested-card .card-header:has(+ .nested-preview) {
-      margin-bottom: 1px;
-    }
+      /* Header in nested cards */
+      .nested-card .card-header {
+        margin-bottom: 0;
+      }
 
-    /* Settings Button */
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      .nested-card .card-header:has(+ .nested-preview) {
+        margin-bottom: 1px;
+      }
 
-    .header-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 5px 6px;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: all 0.15s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+      /* Settings Button */
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-    .header-btn:hover {
-      background: var(--surface-2);
-      color: var(--text);
-      border-color: var(--text-muted);
-    }
+      .header-btn {
+        width: 30px;
+        height: 30px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        padding: 0;
+        cursor: pointer;
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-    #settings-btn svg,
-    #close-btn svg,
-    #info-btn svg {
-      width: 14px;
-      height: 14px;
-      transition: transform 0.3s ease;
-    }
+      .header-btn:hover {
+        background: var(--surface-2);
+        color: var(--text);
+      }
 
-    #settings-btn:hover svg {
-      transform: rotate(90deg);
-    }
+      .header-btn:active {
+        transform: scale(0.92);
+      }
 
-    /* Settings Overlay */
-    #settings-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
+      #settings-btn svg,
+      #close-btn svg,
+      #info-btn svg {
+        width: 16px;
+        height: 16px;
+        transition: transform 0.3s ease;
+      }
 
-    #settings-overlay.visible {
-      display: flex;
-      opacity: 1;
-    }
+      #settings-btn:hover svg {
+        transform: rotate(90deg);
+      }
 
-    @media (prefers-color-scheme: light) {
+      /* Settings Overlay */
       #settings-overlay {
-        background: rgba(0, 0, 0, 0.3);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        opacity: 0;
+        transition: opacity 0.2s ease;
       }
-    }
 
-    /* Settings Modal */
-    #settings-modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      min-width: 260px;
-      max-width: 90%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-10px);
-      transition: transform 0.2s ease;
-    }
+      #settings-overlay.visible {
+        display: flex;
+        opacity: 1;
+      }
 
-    #settings-overlay.visible #settings-modal {
-      transform: translateY(0);
-    }
+      @media (prefers-color-scheme: light) {
+        #settings-overlay {
+          background: rgba(0, 0, 0, 0.3);
+        }
+      }
 
-    @media (prefers-color-scheme: light) {
+      /* Settings Modal */
       #settings-modal {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        min-width: 260px;
+        max-width: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-10px);
+        transition: transform 0.2s ease;
       }
-    }
 
-    /* Info Overlay (shares same pattern as settings) */
-    #info-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
+      #settings-overlay.visible #settings-modal {
+        transform: translateY(0);
+      }
 
-    #info-overlay.visible {
-      display: flex;
-      opacity: 1;
-    }
+      @media (prefers-color-scheme: light) {
+        #settings-modal {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+      }
 
-    #info-modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      min-width: 260px;
-      max-width: 90%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-10px);
-      transition: transform 0.2s ease;
-    }
+      /* Info Overlay (shares same pattern as settings) */
+      #info-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
 
-    #info-overlay.visible #info-modal {
-      transform: translateY(0);
-    }
+      #info-overlay.visible {
+        display: flex;
+        opacity: 1;
+      }
 
-    .info-header {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+      #info-modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        min-width: 260px;
+        max-width: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-10px);
+        transition: transform 0.2s ease;
+      }
 
-    .info-close {
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 4px 6px;
-      cursor: pointer;
-      color: var(--text-muted);
-    }
+      #info-overlay.visible #info-modal {
+        transform: translateY(0);
+      }
 
-    .info-content {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--text);
-    }
+      .info-header {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-    .info-list {
-      padding-left: 16px;
-      margin: 0;
-      color: var(--text-muted);
-    }
+      .info-close {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 6px;
+        cursor: pointer;
+        color: var(--text-muted);
+      }
 
-    .settings-header {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-    }
+      .info-content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text);
+      }
 
-    .settings-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+      .info-list {
+        padding-left: 16px;
+        margin: 0;
+        color: var(--text-muted);
+      }
 
-    .settings-actions button {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      text-align: left;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      .settings-header {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
 
-    .settings-actions button svg {
-      width: 14px;
-      height: 14px;
-      opacity: 0.7;
-      flex-shrink: 0;
-    }
+      .settings-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
 
-    .settings-actions button:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
+      .settings-actions button {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        color: var(--text);
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-    .settings-actions button:hover svg {
-      opacity: 1;
-    }
+      .settings-actions button svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.7;
+        flex-shrink: 0;
+      }
 
-    .settings-actions button.danger {
-      color: var(--text);
-    }
+      .settings-actions button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
 
-    .settings-actions button.danger:hover {
-      border-color: #ef4444;
-      color: #ef4444;
-    }
+      .settings-actions button:hover svg {
+        opacity: 1;
+      }
 
-    #settings-close {
-      width: 100%;
-      margin-top: 14px;
-      padding: 9px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      border: 1px solid var(--accent);
-      background: var(--accent);
-      color: white;
-    }
+      .settings-actions button.danger {
+        color: var(--text);
+      }
 
-    #settings-close:hover {
-      opacity: 0.9;
-    }
+      .settings-actions button.danger:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+      }
 
-    /* Settings Form Controls */
-    .settings-section {
-      margin-bottom: 16px;
-    }
+      #settings-close {
+        width: 100%;
+        margin-top: 14px;
+        padding: 9px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: white;
+      }
 
-    .settings-section-title {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-    }
+      #settings-close:hover {
+        opacity: 0.9;
+      }
 
-    .settings-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
+      /* Settings Form Controls */
+      .settings-section {
+        margin-bottom: 16px;
+      }
 
-    .settings-row:last-child {
-      border-bottom: none;
-    }
+      .settings-section-title {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+      }
 
-    .settings-label {
-      font-size: 12px;
-      color: var(--text);
-    }
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+      }
 
-    .settings-sublabel {
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
+      .settings-row:last-child {
+        border-bottom: none;
+      }
 
-    /* Toggle Switch */
-    .toggle-switch {
-      position: relative;
-      width: 36px;
-      height: 20px;
-      flex-shrink: 0;
-    }
+      .settings-label {
+        font-size: 12px;
+        color: var(--text);
+      }
 
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
+      .settings-sublabel {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
 
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      transition: all 0.2s ease;
-    }
+      /* Toggle Switch */
+      .toggle-switch {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        flex-shrink: 0;
+      }
 
-    .toggle-slider::before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 2px;
-      bottom: 2px;
-      background: var(--text-muted);
-      border-radius: 50%;
-      transition: all 0.2s ease;
-    }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
 
-    .toggle-switch input:checked + .toggle-slider {
-      background: var(--accent);
-      border-color: var(--accent);
-    }
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.2s ease;
+      }
 
-    .toggle-switch input:checked + .toggle-slider::before {
-      transform: translateX(16px);
-      background: white;
-    }
+      .toggle-slider::before {
+        position: absolute;
+        content: '';
+        height: 14px;
+        width: 14px;
+        left: 2px;
+        bottom: 2px;
+        background: var(--text-muted);
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
 
-    /* Select Dropdown */
-    .settings-select {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 11px;
-      color: var(--text);
-      cursor: pointer;
-      min-width: 100px;
-      transition: border-color 0.15s ease;
-    }
+      .toggle-switch input:checked + .toggle-slider {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
 
-    .settings-select:hover {
-      border-color: var(--accent);
-    }
+      .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(16px);
+        background: white;
+      }
 
-    .settings-select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
+      /* Select Dropdown */
+      .settings-select {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 11px;
+        color: var(--text);
+        cursor: pointer;
+        min-width: 100px;
+        transition: border-color 0.15s ease;
+      }
 
-    /* Range Slider */
-    .slider-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+      .settings-select:hover {
+        border-color: var(--accent);
+      }
 
-    .settings-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100px;
-      height: 4px;
-      background: var(--surface-2);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
+      .settings-select:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
 
-    .settings-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
+      /* Range Slider */
+      .slider-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
 
-    .settings-slider::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
-    }
+      .settings-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100px;
+        height: 4px;
+        background: var(--surface-2);
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+      }
 
-    .settings-slider::-moz-range-thumb {
-      width: 14px;
-      height: 14px;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-      border: none;
-    }
+      .settings-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
 
-    .slider-value {
-      font-size: 11px;
-      color: var(--text-muted);
-      min-width: 32px;
-      text-align: right;
-    }
+      .settings-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
 
-    /* Segmented Control (for timestamp format) */
-    .segmented-control {
-      display: flex;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-    }
+      .settings-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+      }
 
-    .segmented-btn {
-      flex: 1;
-      padding: 5px 10px;
-      font-size: 10px;
-      font-weight: 500;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
+      .slider-value {
+        font-size: 11px;
+        color: var(--text-muted);
+        min-width: 32px;
+        text-align: right;
+      }
 
-    .segmented-btn:not(:last-child) {
-      border-right: 1px solid var(--border);
-    }
+      /* Segmented Control (for timestamp format) */
+      .segmented-control {
+        display: flex;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
 
-    .segmented-btn.active {
-      background: var(--accent);
-      color: white;
-    }
+      .segmented-btn {
+        flex: 1;
+        padding: 5px 10px;
+        font-size: 10px;
+        font-weight: 500;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
 
-    .segmented-btn:hover:not(.active) {
-      background: color-mix(in srgb, var(--accent) 10%, transparent);
-      color: var(--text);
-    }
+      .segmented-btn:not(:last-child) {
+        border-right: 1px solid var(--border);
+      }
 
-    /* Divider */
-    .settings-divider {
-      height: 1px;
-      background: var(--border);
-      margin: 12px 0;
-    }
-  </style>
-</head>
-<body>
-  <div id="header">
-    <div id="status-container">
-      <span id="status-dot"></span>
-      <span id="status">Ready</span>
+      .segmented-btn.active {
+        background: var(--accent);
+        color: white;
+      }
+
+      .segmented-btn:hover:not(.active) {
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+        color: var(--text);
+      }
+
+      /* Divider */
+      .settings-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 12px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="tree-root">
+      <div id="tooltip" class="tooltip"></div>
     </div>
-    <div class="header-actions">
-      <button id="info-btn" class="header-btn" title="Info">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="9" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8.5h.01M11.25 11.25h1.5V16h-1.5z" />
-        </svg>
-      </button>
-      <button id="close-btn" class="header-btn" title="Close panel">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-        </svg>
-      </button>
-      <button id="settings-btn" class="header-btn" title="Settings">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        </svg>
-      </button>
-    </div>
-  </div>
-  <div id="tree-root">
-    <div id="tooltip" class="tooltip"></div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="settings-overlay">
-    <div id="settings-modal">
-      <div class="settings-header">Settings</div>
-      
-      <!-- Appearance Section -->
-      <div class="settings-section">
-        <div class="settings-section-title">Appearance</div>
-        
-        <div class="settings-row">
-          <div>
-            <div class="settings-label">Theme</div>
-          </div>
-          <select id="setting-theme" class="settings-select">
-            <option value="system">System</option>
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </div>
-        
-        <div class="settings-row">
-          <div>
-            <div class="settings-label">Compact Mode</div>
-            <div class="settings-sublabel">Smaller cards and text</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="setting-compact">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
+    <div id="header">
+      <div id="status-container">
+        <span id="status-dot"></span>
+        <span id="status">Ready</span>
       </div>
-
-      <!-- Display Section -->
-      <div class="settings-section">
-        <div class="settings-section-title">Display</div>
-        
-        <div class="settings-row">
-          <div>
-            <div class="settings-label">Show Timestamps</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="setting-timestamps" checked>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        
-        <div class="settings-row">
-          <div>
-            <div class="settings-label">Timestamp Format</div>
-          </div>
-          <div class="segmented-control">
-            <button class="segmented-btn active" data-value="absolute">Absolute</button>
-            <button class="segmented-btn" data-value="relative">Relative</button>
-          </div>
-        </div>
-        
-        <div class="settings-row">
-          <div>
-            <div class="settings-label">Preview Length</div>
-          </div>
-          <div class="slider-container">
-            <input type="range" id="setting-preview-length" class="settings-slider" min="40" max="120" value="70">
-            <span id="preview-length-value" class="slider-value">70</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-divider"></div>
-
-      <!-- Actions -->
-      <div class="settings-actions">
-        <button id="refresh">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+      <div class="header-actions">
+        <button id="info-btn" class="header-btn" title="Info">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 8.5h.01M11.25 11.25h1.5V16h-1.5z"
+            />
           </svg>
-          Refresh Tree
         </button>
-        <button id="clear-data" class="danger">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        <button id="settings-btn" class="header-btn" title="Settings">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+            />
           </svg>
-          Clear All Data
+        </button>
+        <button id="close-btn" class="header-btn" title="Close panel">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M6 18 18 6M6 6l12 12"
+            />
+          </svg>
         </button>
       </div>
-      <button id="settings-close">Done</button>
     </div>
-  </div>
 
-  <!-- Info Modal -->
-  <div id="info-overlay">
-    <div id="info-modal">
-      <div class="info-header">
-        <span>Branch Tree · Info</span>
-        <button id="info-close" class="info-close">Close</button>
-      </div>
-      <div class="info-content">
-        <div><strong>Name:</strong> Branch Tree</div>
-        <div><strong>Author:</strong> James (jameszhao2004@gmail.com)</div>
-        <div><strong>Support:</strong> <a href="https://www.buymeacoffee.com/jameszhao" target="_blank" rel="noreferrer">buymeacoffee.com/jameszhao</a></div>
-        <div><strong>How to use:</strong></div>
-        <ul class="info-list">
-          <li>Open a ChatGPT conversation; the panel tracks branches automatically.</li>
-          <li>Click branches or messages to navigate; collapsed branches show previews.</li>
-          <li>Use the header buttons to refresh, close, open settings, or view this info.</li>
-        </ul>
+    <!-- Settings Modal -->
+    <div id="settings-overlay">
+      <div id="settings-modal">
+        <div class="settings-header">Settings</div>
+
+        <!-- Appearance Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Appearance</div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Theme</div>
+            </div>
+            <select id="setting-theme" class="settings-select">
+              <option value="system">System</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Compact Mode</div>
+              <div class="settings-sublabel">Smaller cards and text</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-compact" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Display Section -->
+        <div class="settings-section">
+          <div class="settings-section-title">Display</div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Show Timestamps</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-timestamps" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Timestamp Format</div>
+            </div>
+            <div class="segmented-control">
+              <button class="segmented-btn active" data-value="absolute">
+                Absolute
+              </button>
+              <button class="segmented-btn" data-value="relative">
+                Relative
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Preview Length</div>
+            </div>
+            <div class="slider-container">
+              <input
+                type="range"
+                id="setting-preview-length"
+                class="settings-slider"
+                min="40"
+                max="120"
+                value="70"
+              />
+              <span id="preview-length-value" class="slider-value">70</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <!-- Actions -->
+        <div class="settings-actions">
+          <button id="refresh">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+            Refresh Tree
+          </button>
+          <button id="clear-data" class="danger">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+              />
+            </svg>
+            Clear All Data
+          </button>
+        </div>
+        <button id="settings-close">Done</button>
       </div>
     </div>
-  </div>
 
-  <script src="panel.js"></script>
-</body>
+    <!-- Info Modal -->
+    <div id="info-overlay">
+      <div id="info-modal">
+        <div class="info-header">
+          <span>Branch Tree · Info</span>
+          <button id="info-close" class="info-close">Close</button>
+        </div>
+        <div class="info-content">
+          <div><strong>Name:</strong> Branch Tree</div>
+          <div><strong>Author:</strong> James (jameszhao2004@gmail.com)</div>
+          <div>
+            <strong>Support:</strong>
+            <a
+              href="https://www.buymeacoffee.com/jameszhao"
+              target="_blank"
+              rel="noreferrer"
+              >buymeacoffee.com/jameszhao</a
+            >
+          </div>
+          <div><strong>How to use:</strong></div>
+          <ul class="info-list">
+            <li>
+              Open a ChatGPT conversation; the panel tracks branches
+              automatically.
+            </li>
+            <li>
+              Click branches or messages to navigate; collapsed branches show
+              previews.
+            </li>
+            <li>
+              Use the header buttons to refresh, close, open settings, or view
+              this info.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script src="panel.js"></script>
+  </body>
 </html>
