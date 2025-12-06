@@ -352,8 +352,7 @@ function markTerminalNodes(nodes) {
  */
 function annotateContextContinuations(nodes) {
   const makeKey = (node) => `${node.depth ?? 0}|${node.colorIndex ?? 'main'}`;
-  const shouldTrack = (node) =>
-    node.type !== 'branch' && node.type !== 'nested-branch';
+  const shouldTrack = (node) => node.type !== 'branch';
 
   const seen = new Set();
   for (let i = 0; i < nodes.length; i++) {
@@ -581,10 +580,6 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   if (isMainViewingTitle) row.classList.add('is-main-viewing');
   if (isLast) row.classList.add('is-last-node');
   if (isTerminal) row.classList.add('is-terminal');
-  // Mark branches that have nested children (for showing connector line to them)
-  if (isBranch && !isExpanded && node.nestedBranches?.length > 0) {
-    row.classList.add('has-nested');
-  }
 
   // Determine color: branches use their deterministic color based on conversation ID
   // Non-branch messages in a branch also use their inherited colorIndex
@@ -685,11 +680,7 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
     // Set the main line color for the T-junction
     // Use the parent/main-line color for the T junction; prefer previous non-branch color if available
     let prevColor = null;
-    if (
-      prevNode &&
-      prevNode.type !== 'branch' &&
-      prevNode.type !== 'nested-branch'
-    ) {
+    if (prevNode && prevNode.type !== 'branch') {
       const prevEl = prevNodeRow(prevNode);
       if (prevEl) {
         prevColor =
@@ -847,132 +838,6 @@ function createNodeElement(node, index, total, prevNode, nextNode, allNodes) {
   return row;
 }
 
-/**
- * Create a nested branch preview element (compact view for collapsed branches)
- * @param node - The nested branch node data
- * @param parentColorIndex - The colorIndex of the parent branch (for connecting lines)
- * @param isFirst - Whether this is the first nested branch in the group
- * @param isLast - Whether this is the last nested branch in the group
- * @param mainLineContinues - Whether the main line continues after all nested branches
- */
-function createNestedBranchElement(
-  node,
-  parentColorIndex,
-  isFirst = false,
-  isLast = false,
-  mainLineContinues = false
-) {
-  const { id, text, depth, targetConversationId, branchPath, colorIndex } =
-    node;
-
-  const row = document.createElement('div');
-  row.className = 'tree-node nested-branch-node';
-  row.dataset.nodeId = id;
-  row.dataset.depth = depth ?? 0;
-
-  // Mark first nested branch (extends line up to connect with parent)
-  if (isFirst) {
-    row.classList.add('is-first-nested');
-  }
-
-  // Mark last nested branch (no line continuing below)
-  if (isLast) {
-    row.classList.add('is-last-nested');
-  }
-
-  // Mark if main line continues (to show main purple line alongside)
-  if (mainLineContinues) {
-    row.classList.add('main-line-continues');
-  }
-
-  // Use the node's OWN colorIndex for the dot (unique color per branch)
-  const ownColor = getBranchColor(colorIndex ?? parentColorIndex ?? 0);
-  // Use the PARENT's colorIndex for connecting lines
-  const parentColor = getBranchColor(parentColorIndex ?? 0);
-
-  // Set both color variables
-  row.style.setProperty('--color', ownColor);
-  row.style.setProperty('--branch-color', ownColor);
-  row.style.setProperty('--parent-color', parentColor);
-  row.style.setProperty('--main-color', getColor(0)); // Main line is always depth 0 color
-  row.dataset.color = ownColor;
-
-  // Rail (visual connector)
-  const rail = document.createElement('div');
-  rail.className = 'rail nested-rail';
-  rail.style.setProperty('--depth', depth ?? 0);
-
-  // Depth indentation lines: use parent color and highlight parent column when continuing
-  const branchColumnIndex = Math.max((depth ?? 1) - 1, 0);
-  for (let i = 0; i < (depth ?? 0); i++) {
-    const line = document.createElement('span');
-    line.className = 'rail-line nested-rail-line';
-    line.style.setProperty('--line-color', parentColor);
-    if (mainLineContinues && i === branchColumnIndex) {
-      line.classList.add('main-line');
-      line.style.setProperty('--line-color', parentColor);
-    }
-    rail.appendChild(line);
-  }
-
-  // Connector with small dot
-  const connector = document.createElement('span');
-  connector.className = 'rail-connector nested-connector';
-
-  const dot = document.createElement('span');
-  dot.className = 'rail-dot nested-dot';
-  // Dot uses the branch's OWN color
-  dot.style.setProperty('--branch-color', ownColor);
-  connector.appendChild(dot);
-  rail.appendChild(connector);
-
-  row.appendChild(rail);
-
-  // Compact card
-  const card = document.createElement('div');
-  card.className = 'tree-card nested-card';
-  // Card border uses the branch's OWN color
-  card.style.setProperty('--branch-color', ownColor);
-
-  // Header with branch path
-  const header = document.createElement('div');
-  header.className = 'card-header';
-
-  const label = document.createElement('span');
-  label.className = 'card-label label-branch nested-label';
-  label.textContent = branchPath || 'Branch';
-  // Label uses the branch's OWN color
-  label.style.setProperty('--color', ownColor);
-  header.appendChild(label);
-
-  card.appendChild(header);
-
-  // Text preview (truncated)
-  const trimmedText = truncate(text, 50);
-  if (trimmedText) {
-    const preview = document.createElement('div');
-    preview.className = 'card-preview nested-preview';
-    preview.textContent = trimmedText;
-    card.appendChild(preview);
-  }
-
-  row.appendChild(card);
-
-  // Store data for tooltip and click handling (in dataset for event delegation)
-  row.dataset.fullText = text || '';
-  row.dataset.type = 'nested-branch';
-  row.dataset.targetConv = targetConversationId || '';
-
-  // Store node data in Map for event delegation (avoids closure memory leaks)
-  nodeDataMap.set(id, {
-    id,
-    type: 'branch', // Nested branches navigate like regular branches
-    targetConversationId
-  });
-
-  return row;
-}
-
 const NO_CONVERSATION_STEPS = [
   'Open or start a conversation in ChatGPT.',
   'Use "Branch in new chat" whenever you fork the thread.',
@@ -1079,12 +944,7 @@ function renderTree(nodes, title, hasAncestry = false) {
 
   // Filter out nodes with empty text (keep branches, branchRoots, and title types)
   const filteredNodes = (nodes || []).filter((node) => {
-    if (
-      node.type === 'branch' ||
-      node.type === 'branchRoot' ||
-      node.type === 'nested-branch'
-    )
-      return true;
+    if (node.type === 'branch' || node.type === 'branchRoot') return true;
     if (
       node.type === 'title' ||
       node.type === 'ancestor-title' ||
@@ -1129,29 +989,27 @@ function renderTree(nodes, title, hasAncestry = false) {
   }
   allNodes.push(...filteredNodes);
 
-  // For root view (no ancestry), inline nested branch previews as regular branch nodes
-  if (!hasAncestry) {
-    const expandedNodes = [];
-    allNodes.forEach((node) => {
-      expandedNodes.push(node);
-      if (
-        node.type === 'branch' &&
-        !node.expanded &&
-        node.nestedBranches?.length > 0
-      ) {
-        node.nestedBranches.forEach((nested) => {
-          expandedNodes.push({
-            ...nested,
-            type: 'branch',
-            expanded: false,
-            isNestedInline: true
-          });
+  // Inline nested branches as regular branch nodes (keep normal layout everywhere)
+  const expandedNodes = [];
+  allNodes.forEach((node) => {
+    expandedNodes.push(node);
+    if (
+      node.type === 'branch' &&
+      !node.expanded &&
+      node.nestedBranches?.length > 0
+    ) {
+      node.nestedBranches.forEach((nested) => {
+        expandedNodes.push({
+          ...nested,
+          type: 'branch',
+          expanded: false,
+          isNestedInline: true
         });
-      }
-    });
-    allNodes.length = 0;
-    allNodes.push(...expandedNodes);
-  }
+      });
+    }
+  });
+  allNodes.length = 0;
+  allNodes.push(...expandedNodes);
 
   // Mark terminal nodes before rendering
   markTerminalNodes(allNodes);
@@ -1159,7 +1017,6 @@ function renderTree(nodes, title, hasAncestry = false) {
 
   const fragment = document.createDocumentFragment();
   let visualIndex = 0; // Track visual position for staggered animation
-  const renderNestedPreviews = hasAncestry;
   allNodes.forEach((node, idx) => {
     const prevNode = idx > 0 ? allNodes[idx - 1] : null;
     const nextNode = idx < allNodes.length - 1 ? allNodes[idx + 1] : null;
@@ -1174,36 +1031,6 @@ function renderTree(nodes, title, hasAncestry = false) {
       )
     );
     visualIndex++;
-
-    // If this is a collapsed branch with nested branches, render them
-    if (
-      renderNestedPreviews &&
-      node.type === 'branch' &&
-      !node.expanded &&
-      node.nestedBranches?.length > 0
-    ) {
-      // Check if main line continues after this branch and its nested branches
-      const mainLineContinues = findMainLineContinuation(
-        allNodes,
-        idx,
-        node.depth ?? 0
-      );
-
-      node.nestedBranches.forEach((nestedNode, nestedIdx) => {
-        const isFirstNested = nestedIdx === 0;
-        const isLastNested = nestedIdx === node.nestedBranches.length - 1;
-        const nestedEl = createNestedBranchElement(
-          nestedNode,
-          node.colorIndex,
-          isFirstNested,
-          isLastNested,
-          mainLineContinues
-        );
-        nestedEl.style.animationDelay = `${Math.min(visualIndex, 15) * 30}ms`;
-        fragment.appendChild(nestedEl);
-        visualIndex++;
-      });
-    }
   });
   treeRoot.appendChild(fragment);
 
@@ -1224,7 +1051,7 @@ function drawBackbones() {
 
   const railSize = 20; // matches --rail-size
 
-  // Group nodes by depth with their rects/colors (keep nested previews for ordering)
+  // Group nodes by depth with their rects/colors
   const nodesByDepth = new Map();
   nodes.forEach((node) => {
     const type = node.dataset.type || '';
@@ -1238,8 +1065,7 @@ function drawBackbones() {
       top,
       bottom,
       color,
-      type,
-      isBackboneNode: type !== 'nested-branch'
+      type
     });
     nodesByDepth.set(depth, entry);
   });
@@ -1265,9 +1091,6 @@ function drawBackbones() {
       ) {
         continue;
       }
-
-      // Skip connecting through nested previews; they draw their own rails
-      if (!current.isBackboneNode || !next.isBackboneNode) continue;
 
       const backbone = document.createElement('div');
       backbone.className = 'tree-backbone';
@@ -1302,8 +1125,7 @@ function showTooltip(el, text, type) {
 
   tooltip.textContent = text || '(empty message)';
   tooltip.className = 'tooltip visible';
-  if (type === 'branch' || type === 'nested-branch')
-    tooltip.classList.add('tooltip-branch');
+  if (type === 'branch') tooltip.classList.add('tooltip-branch');
 
   // Position tooltip
   const top = rect.top - containerRect.top + treeRoot.scrollTop;

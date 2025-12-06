@@ -367,15 +367,14 @@
       const colorIndex = hashConversationId(branch.childId);
       const branchNode = {
         id: `nested-branch:${branch.childId}`,
-        type: 'nested-branch',
+        type: 'branch',
         text: branch.firstMessage || branch.title || 'Branched conversation',
         createTime: toSeconds(branch.createdAt || 0),
         targetConversationId: branch.childId,
         colorIndex: colorIndex, // Deterministic color based on conversation ID
-        nestedBranchIndex: idx, // Index within this level for potential differentiation
+        branchIndex: idx,
         depth: baseDepth,
-        branchPath: branchPath,
-        isNestedPreview: true // Flag to indicate this is a compact preview node
+        branchPath: branchPath
       };
       result.push(branchNode);
 
@@ -523,7 +522,7 @@
         node.branchPath = branchPath
           ? `${branchPath}.${idx + 1}`
           : `${idx + 1}`;
-        // Collect nested branches for non-expanded branches (for compact preview when collapsed)
+        // Collect nested branches for non-expanded branches to inline them when collapsed
         if (!node.expanded) {
           node.nestedBranches = collectNestedBranches(
             node.targetConversationId,
@@ -651,7 +650,7 @@
       node.branchIndex = idx;
       // Build hierarchical path for branches from current conversation
       node.branchPath = branchPath ? `${branchPath}.${idx + 1}` : `${idx + 1}`;
-      // Collect nested branches for this branch (for compact preview when collapsed)
+      // Collect nested branches for this branch so they can be inlined when collapsed
       node.nestedBranches = collectNestedBranches(
         node.targetConversationId,
         branchData,
@@ -773,7 +772,7 @@
     branchNodes.forEach((node, idx) => {
       node.branchIndex = idx;
       node.branchPath = `${idx + 1}`;
-      // Collect nested branches for this branch (for compact preview when collapsed)
+      // Collect nested branches for this branch so they can be inlined when collapsed
       node.nestedBranches = collectNestedBranches(
         node.targetConversationId,
         branchData,
